@@ -12,3 +12,6 @@ Thumbs.db
 *.war
 *.class
 target/
+
+# Local config with secrets — copy config.sample.json to config.json and fill in real values
+config.json
