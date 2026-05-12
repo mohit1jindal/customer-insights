@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Customer Insights — Code to Business Language</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,600;1,9..144,300&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css"/>
+</head>
+<body>
+
+<header>
+  <div class="header-brand">
+    <h1>Customer Insights</h1>
+    <span>code → business language</span>
+  </div>
+  <div class="header-status">
+    <div class="dot" id="status-dot"></div>
+    <span id="status-text">not configured</span>
+  </div>
+</header>
+
+<!-- Sidebar -->
+<aside>
+  <!-- Config (collapsible) -->
+  <div class="config-toggle" onclick="toggleConfig()">
+    <span>⚙ Configuration</span>
+    <span id="config-chevron">▼</span>
+  </div>
+  <div class="config-body" id="config-body">
+    <div class="config-group">
+      <label>Anthropic API Key</label>
+      <input type="password" id="anthropic-key" placeholder="sk-ant-..." oninput="saveConfig()"/>
+    </div>
+    <div class="config-group">
+      <label>GitHub Token <span class="tag">private repos</span></label>
+      <input type="password" id="github-token" placeholder="ghp_..." oninput="saveConfig()"/>
+    </div>
+    <div class="config-group">
+      <label>GitHub Org / User</label>
+      <input type="text" id="github-org" placeholder="your-org-name" oninput="saveConfig()"/>
+    </div>
+    <button class="btn primary" onclick="loadRepos()" id="load-btn">Load Repositories</button>
+  </div>
+
+  <!-- Repo search -->
+  <div class="repo-search-wrap">
+    <div class="sidebar-label">Repositories</div>
+    <input type="search" id="repo-search" placeholder="Search customer..." oninput="filterRepos()"/>
+  </div>
+
+  <div class="repo-list" id="repo-list">
+    <div class="repo-empty">Configure credentials above, then load repositories.</div>
+  </div>
+
+  <!-- Compare bar (shown in compare mode) -->
+  <div class="compare-bar" id="compare-bar" style="display:none">
+    <div class="compare-selected" id="compare-selected">0 customers selected</div>
+    <button class="btn primary" onclick="runCompare()" id="compare-btn" disabled>Compare Selected</button>
+  </div>
+</aside>
+
+<!-- Main -->
+<main>
+  <div class="mode-tabs">
+    <div class="tab active" data-mode="summarise" onclick="setMode('summarise')">Summarise Customer</div>
+    <div class="tab" data-mode="translate" onclick="setMode('translate')">Translate Script</div>
+    <div class="tab" data-mode="feature" onclick="setMode('feature')">Feature Search</div>
+    <div class="tab" data-mode="compare" onclick="setMode('compare')">Cross-Customer Compare</div>
+  </div>
+
+  <div class="query-area">
+    <div class="query-row">
+      <textarea id="query-input" rows="2" placeholder="Select a customer from the sidebar, then ask anything..."></textarea>
+      <button class="send-btn" id="send-btn" onclick="runQuery()">Ask →</button>
+    </div>
+    <div class="quick-prompts" id="quick-prompts"></div>
+    <div class="feature-note" id="feature-note" style="display:none">Feature search scans all repositories — this may take a moment.</div>
+  </div>
+
+  <div class="results" id="results">
+    <div class="empty-state" id="empty-state">
+      <div class="empty-icon">◈</div>
+      <h2>Ready to translate</h2>
+      <p>Load your GitHub repositories, select a customer, and ask questions in plain English.</p>
+      <div class="steps">
+        <div class="step">1. configure</div>
+        <div class="step">2. load repos</div>
+        <div class="step">3. select customer</div>
+        <div class="step">4. ask</div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<script src="js/app.js"></script>
+</body>
+</html>
