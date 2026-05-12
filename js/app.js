@@ -48,6 +48,28 @@ function loadConfig() {
   updateStatus();
 }
 
+// Fetches config.json from the server and populates credentials.
+// Returns true if credentials were loaded, false to fall back to localStorage.
+async function loadServerConfig() {
+  try {
+    const res = await fetch('config.json');
+    if (!res.ok) return false;
+    const cfg = await res.json();
+    if (!cfg.anthropicKey && !cfg.githubToken && !cfg.githubOrg) return false;
+    if (cfg.anthropicKey) document.getElementById('anthropic-key').value = cfg.anthropicKey;
+    if (cfg.githubToken)  document.getElementById('github-token').value  = cfg.githubToken;
+    if (cfg.githubOrg)    document.getElementById('github-org').value    = cfg.githubOrg;
+    updateStatus();
+    // Collapse config panel — credentials pre-loaded from server
+    configVisible = false;
+    document.getElementById('config-body').classList.add('hidden');
+    document.getElementById('config-chevron').textContent = '▶';
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function updateStatus() {
   const hasAnthro = !!document.getElementById('anthropic-key').value;
   const hasGH = !!document.getElementById('github-token').value;
@@ -86,7 +108,6 @@ async function loadRepos() {
       const url = `https://api.github.com/orgs/${org}/repos?per_page=100&page=${page}&type=private`;
       const res = await fetch(url, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json' } });
       if (!res.ok) {
-        // try user repos if org fails
         const res2 = await fetch(`https://api.github.com/user/repos?per_page=100&page=${page}&visibility=private`, {
           headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json' }
         });
@@ -103,7 +124,6 @@ async function loadRepos() {
     }
     allRepos.sort((a,b) => a.name.localeCompare(b.name));
     renderRepoList(allRepos);
-    // collapse config after loading
     configVisible = false;
     document.getElementById('config-body').classList.add('hidden');
     document.getElementById('config-chevron').textContent = '▶';
@@ -199,12 +219,10 @@ async function fetchRepoFiles(repoName, maxFiles = 20) {
   const org = document.getElementById('github-org').value.trim();
   const headers = { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json' };
 
-  // Get repo tree
   const treeRes = await fetch(`https://api.github.com/repos/${org}/${repoName}/git/trees/HEAD?recursive=1`, { headers });
   if (!treeRes.ok) throw new Error(`Could not read repo: ${repoName}`);
   const tree = await treeRes.json();
 
-  // Prioritise business logic files
   const PRIORITY_PATTERNS = [/\.py$/, /\.js$/, /\.ts$/, /\.java$/, /\.cs$/, /\.rb$/, /\.php$/, /config/i, /settings/i, /business/i, /logic/i, /process/i, /rules/i, /\.sql$/];
   const SKIP_PATTERNS = [/node_modules/, /\.min\.js/, /dist\//, /build\//, /package-lock/, /yarn\.lock/, /\.lock$/, /\.map$/, /\.png/, /\.jpg/, /\.ico/, /\.svg/];
 
@@ -218,7 +236,6 @@ async function fetchRepoFiles(repoName, maxFiles = 20) {
     })
     .slice(0, maxFiles);
 
-  // Fetch file contents in parallel
   const contents = await Promise.all(files.map(async f => {
     try {
       const r = await fetch(`https://api.github.com/repos/${org}/${repoName}/contents/${f.path}`, { headers });
@@ -275,7 +292,6 @@ async function runQuery() {
 
   try {
     const code = await fetchRepoFiles(selectedRepo, currentMode === 'summarise' ? 15 : 20);
-
     document.getElementById('status-text').textContent = 'asking Claude...';
 
     const systemPrompt = currentMode === 'summarise'
@@ -307,7 +323,6 @@ async function runFeatureSearch(query) {
   document.getElementById('status-dot').className = 'dot loading';
 
   try {
-    // Sample top 30 repos for feature search (to avoid rate limits)
     const sample = allRepos.slice(0, 30);
     document.getElementById('status-text').textContent = `scanning ${sample.length} repos...`;
 
@@ -406,6 +421,10 @@ function updateResultCard(card, text, isError) {
 }
 
 // ── Init ──
-loadConfig();
-renderQuickPrompts();
-updatePlaceholder();
+// Try loading credentials from config.json first; fall back to localStorage.
+(async () => {
+  const fromServer = await loadServerConfig();
+  if (!fromServer) loadConfig();
+  renderQuickPrompts();
+  updatePlaceholder();
+})();
