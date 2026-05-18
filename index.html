@@ -18,6 +18,9 @@
   <div class="header-status">
     <div class="dot" id="status-dot"></div>
     <span id="status-text">not configured</span>
+    <span id="rate-limit-status" class="rate-limit-status" style="display:none">
+      <span id="rate-limit-count"></span>
+    </span>
   </div>
 </header>
 
@@ -34,7 +37,7 @@
       <input type="password" id="anthropic-key" placeholder="sk-ant-..." oninput="saveConfig()"/>
     </div>
     <div class="config-group">
-      <label>GitHub Token <span class="tag">private repos</span></label>
+      <label>GitHub Token <span class="tag">all repos</span></label>
       <input type="password" id="github-token" placeholder="ghp_..." oninput="saveConfig()"/>
     </div>
     <div class="config-group">
@@ -75,8 +78,12 @@
       <textarea id="query-input" rows="2" placeholder="Select a customer from the sidebar, then ask anything..."></textarea>
       <button class="send-btn" id="send-btn" onclick="runQuery()">Ask →</button>
     </div>
+    <div class="path-filter-row" id="path-filter-row">
+      <span class="path-filter-label">Focus on folder</span>
+      <input type="text" id="path-filter" placeholder="e.g. src/business/ (optional)"/>
+    </div>
     <div class="quick-prompts" id="quick-prompts"></div>
-    <div class="feature-note" id="feature-note" style="display:none">Feature search scans all repositories — this may take a moment.</div>
+    <div class="feature-note" id="feature-note" style="display:none">Feature search scans up to 50 repositories — this may take a moment.</div>
   </div>
 
   <div class="results" id="results">
