@@ -1,0 +1,901 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Customer Insights — Technical Guide</title>
+<style>
+  /* ── Print / PDF layout ── */
+  @page {
+    size: A4;
+    margin: 22mm 20mm 22mm 20mm;
+  }
+  @media print {
+    .no-print { display: none !important; }
+    h2 { page-break-before: always; }
+    h2.no-break { page-break-before: avoid; }
+    pre, table, .card { page-break-inside: avoid; }
+    a { color: inherit; text-decoration: none; }
+  }
+
+  /* ── Fonts & reset ── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --ink:    #1a1814;
+    --ink2:   #3a3630;
+    --ink3:   #7a736a;
+    --paper:  #faf8f4;
+    --paper2: #f2ede6;
+    --paper3: #e8e0d5;
+    --accent: #c8541a;
+    --green:  #2a7a4a;
+    --red:    #c0392b;
+    --border: rgba(26,24,20,0.15);
+    --radius: 5px;
+    --mono: 'Courier New', Courier, monospace;
+  }
+
+  body {
+    font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+    font-size: 13px;
+    line-height: 1.7;
+    color: var(--ink);
+    background: var(--paper);
+    max-width: 820px;
+    margin: 0 auto;
+    padding: 48px 40px 80px;
+  }
+
+  /* ── Cover ── */
+  .cover {
+    text-align: center;
+    padding: 60px 0 48px;
+    border-bottom: 2px solid var(--accent);
+    margin-bottom: 48px;
+  }
+  .cover-tag {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 2px;
+    color: var(--accent);
+    text-transform: uppercase;
+    margin-bottom: 18px;
+  }
+  .cover h1 {
+    font-size: 36px;
+    font-weight: 300;
+    color: var(--ink);
+    letter-spacing: -1px;
+    margin-bottom: 10px;
+  }
+  .cover h1 strong { font-weight: 700; color: var(--accent); }
+  .cover-sub {
+    font-size: 15px;
+    color: var(--ink3);
+    margin-bottom: 28px;
+  }
+  .cover-meta {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--ink3);
+    display: flex;
+    justify-content: center;
+    gap: 24px;
+    flex-wrap: wrap;
+  }
+
+  /* ── TOC ── */
+  .toc {
+    background: var(--paper2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px 28px;
+    margin-bottom: 48px;
+  }
+  .toc-title {
+    font-size: 11px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--ink3);
+    font-family: var(--mono);
+    margin-bottom: 12px;
+  }
+  .toc ol {
+    padding-left: 20px;
+  }
+  .toc li {
+    margin-bottom: 4px;
+    font-size: 13px;
+  }
+  .toc a {
+    color: var(--accent);
+    text-decoration: none;
+  }
+  .toc a:hover { text-decoration: underline; }
+
+  /* ── Headings ── */
+  h2 {
+    font-size: 22px;
+    font-weight: 600;
+    color: var(--ink);
+    margin: 48px 0 16px;
+    padding-bottom: 8px;
+    border-bottom: 2px solid var(--accent);
+    letter-spacing: -0.3px;
+  }
+  h3 {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--ink2);
+    margin: 28px 0 10px;
+  }
+  h4 {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ink2);
+    margin: 20px 0 6px;
+    font-family: var(--mono);
+  }
+
+  /* ── Body text ── */
+  p { margin-bottom: 12px; }
+  p:last-child { margin-bottom: 0; }
+  ul, ol { margin: 8px 0 14px 22px; }
+  li { margin-bottom: 5px; }
+  strong { font-weight: 600; color: var(--ink); }
+  em { font-style: italic; color: var(--ink2); }
+
+  /* ── Code ── */
+  code {
+    font-family: var(--mono);
+    font-size: 12px;
+    background: var(--paper3);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 1px 5px;
+    color: var(--accent);
+  }
+  pre {
+    background: #1a1814;
+    color: #f2ede6;
+    font-family: var(--mono);
+    font-size: 12px;
+    line-height: 1.6;
+    border-radius: var(--radius);
+    padding: 16px 18px;
+    overflow-x: auto;
+    margin: 12px 0 18px;
+  }
+  pre code {
+    background: none;
+    border: none;
+    padding: 0;
+    color: inherit;
+    font-size: 12px;
+  }
+
+  /* ── Tables ── */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 14px 0 20px;
+    font-size: 12.5px;
+  }
+  th {
+    background: var(--paper3);
+    font-weight: 600;
+    text-align: left;
+    padding: 8px 12px;
+    border: 1px solid var(--border);
+    color: var(--ink2);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  td {
+    padding: 7px 12px;
+    border: 1px solid var(--border);
+    vertical-align: top;
+  }
+  tr:nth-child(even) td { background: var(--paper2); }
+
+  /* ── Cards ── */
+  .card {
+    background: var(--paper2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 18px 20px;
+    margin: 14px 0;
+  }
+  .card-title {
+    font-weight: 600;
+    font-size: 13px;
+    color: var(--ink);
+    margin-bottom: 6px;
+  }
+
+  /* ── Callouts ── */
+  .callout {
+    border-left: 3px solid var(--accent);
+    background: rgba(200,84,26,0.06);
+    padding: 10px 14px;
+    margin: 14px 0;
+    border-radius: 0 var(--radius) var(--radius) 0;
+    font-size: 12.5px;
+  }
+  .callout.warning {
+    border-left-color: #e67e22;
+    background: rgba(230,126,34,0.06);
+  }
+  .callout.danger {
+    border-left-color: var(--red);
+    background: rgba(192,57,43,0.06);
+  }
+  .callout.success {
+    border-left-color: var(--green);
+    background: rgba(42,122,74,0.06);
+  }
+  .callout strong { display: block; margin-bottom: 4px; }
+
+  /* ── Badges ── */
+  .badge {
+    display: inline-block;
+    font-family: var(--mono);
+    font-size: 10px;
+    padding: 2px 7px;
+    border-radius: 3px;
+    font-weight: 600;
+    vertical-align: middle;
+    margin-left: 4px;
+  }
+  .badge.fix     { background: rgba(42,122,74,0.12);  color: var(--green); }
+  .badge.warn    { background: rgba(200,84,26,0.12);  color: var(--accent); }
+  .badge.info    { background: rgba(41,128,185,0.12); color: #2980b9; }
+
+  /* ── Step list ── */
+  .steps { counter-reset: step; list-style: none; padding-left: 0; margin: 14px 0; }
+  .steps li {
+    counter-increment: step;
+    display: flex;
+    gap: 14px;
+    margin-bottom: 12px;
+    align-items: flex-start;
+  }
+  .steps li::before {
+    content: counter(step);
+    min-width: 26px;
+    height: 26px;
+    background: var(--accent);
+    color: white;
+    border-radius: 50%;
+    font-size: 12px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+
+  /* ── Divider ── */
+  hr {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 32px 0;
+  }
+
+  /* ── Section number ── */
+  .section-num {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--accent);
+    margin-right: 8px;
+  }
+
+  /* ── No-print print button ── */
+  .print-btn {
+    position: fixed;
+    bottom: 28px;
+    right: 28px;
+    background: var(--accent);
+    color: white;
+    border: none;
+    border-radius: var(--radius);
+    padding: 10px 20px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+  }
+  .print-btn:hover { background: #a84010; }
+
+  /* ── Architecture diagram ── */
+  .arch-diagram {
+    background: #1a1814;
+    color: #f2ede6;
+    font-family: var(--mono);
+    font-size: 12px;
+    line-height: 1.9;
+    border-radius: var(--radius);
+    padding: 20px 24px;
+    margin: 14px 0;
+    white-space: pre;
+  }
+</style>
+</head>
+<body>
+
+<!-- Print button (hidden when printing) -->
+<button class="print-btn no-print" onclick="window.print()">Save as PDF ↓</button>
+
+<!-- ── Cover ── -->
+<div class="cover">
+  <div class="cover-tag">Technical Reference &amp; Deployment Guide</div>
+  <h1>Customer <strong>Insights</strong></h1>
+  <div class="cover-sub">Translate GitHub repositories into plain business language using AI</div>
+  <div class="cover-meta">
+    <span>Version 5.0</span>
+    <span>Pure Static HTML/JS/CSS</span>
+    <span>WAR-deployable</span>
+    <span>Multi-LLM</span>
+  </div>
+</div>
+
+<!-- ── TOC ── -->
+<div class="toc">
+  <div class="toc-title">Contents</div>
+  <ol>
+    <li><a href="#overview">Overview &amp; Problem Statement</a></li>
+    <li><a href="#why-built">Why It Was Built</a></li>
+    <li><a href="#use-cases">Use Cases</a></li>
+    <li><a href="#features">What It Can Do — Full Feature List</a></li>
+    <li><a href="#architecture">Technical Architecture</a></li>
+    <li><a href="#quick-start">Quick Start (Browser)</a></li>
+    <li><a href="#war-deployment">WAR Deployment Guide</a></li>
+    <li><a href="#config-reference">Configuration Reference</a></li>
+    <li><a href="#security">Security Considerations</a></li>
+    <li><a href="#oop-design">Object-Oriented Design</a></li>
+    <li><a href="#limitations">Known Limitations</a></li>
+  </ol>
+</div>
+
+
+<!-- ── 1. Overview ── -->
+<h2 id="overview"><span class="section-num">01</span>Overview &amp; Problem Statement</h2>
+
+<p>Most software teams have a growing gap between the people who write code and the people who own the business. Developers understand what the system does technically; stakeholders understand what the business needs. Bridging that gap traditionally requires hours of manual documentation, time-consuming code reviews, or dedicated business analyst effort.</p>
+
+<p><strong>Customer Insights</strong> closes that gap instantly. It connects directly to a GitHub organisation, reads the actual source code of any repository, and uses an AI language model to answer questions in plain English — no technical background required.</p>
+
+<div class="card">
+  <div class="card-title">In one sentence</div>
+  Point it at a GitHub repository. Ask a question in plain English. Get a business-level answer in seconds.
+</div>
+
+<p>The tool is a zero-dependency, browser-based application. It requires no server, no build pipeline, no database, and no installed software beyond a modern browser. It can also be packaged as a Java WAR file and deployed to any Java application server (Tomcat, JBoss, WebLogic, WebSphere) for team-wide access.</p>
+
+
+<!-- ── 2. Why Built ── -->
+<h2 id="why-built"><span class="section-num">02</span>Why It Was Built</h2>
+
+<p>The idea emerged from a recurring frustration: when onboarding onto a new project or reviewing a customer's implementation, the fastest way to understand what a system does is to ask someone who built it. But that person is often unavailable, no longer on the team, or the code has evolved beyond their memory.</p>
+
+<p>Existing alternatives all had significant barriers:</p>
+
+<ul>
+  <li><strong>Custom GPT integrations</strong> — required API access setup that was difficult to approve and demo within organisation security constraints.</li>
+  <li><strong>MCP (Model Context Protocol) tools</strong> — too technical to hand to a non-developer audience; required local tooling.</li>
+  <li><strong>Manual documentation</strong> — always out of date; rarely reflected the actual running code.</li>
+  <li><strong>Code review sessions</strong> — time-intensive; required a developer in the room.</li>
+</ul>
+
+<p>The goal was to build something that a project manager, a solutions consultant, or a business analyst could pick up and use immediately — with nothing installed, no setup beyond entering an API key, and answers in the language they already use.</p>
+
+<div class="callout success">
+  <strong>Core principle</strong>
+  The code <em>is</em> the documentation. Rather than maintaining a parallel knowledge base that drifts from reality, this tool reads the live source and derives understanding on demand.
+</div>
+
+
+<!-- ── 3. Use Cases ── -->
+<h2 id="use-cases"><span class="section-num">03</span>Use Cases</h2>
+
+<h3>Use Case 1 — Customer Onboarding</h3>
+<p><strong>Who:</strong> Solutions consultant, implementation engineer, or account manager joining a project mid-flight.</p>
+<p><strong>Situation:</strong> A customer's implementation has dozens of customised files built over several years. There is no handover document.</p>
+<p><strong>Action:</strong> Select the customer's repository → ask "What does this customer's system do?" → receive a structured business-level summary in under 30 seconds.</p>
+
+<h3>Use Case 2 — Non-Technical Stakeholder Q&amp;A</h3>
+<p><strong>Who:</strong> Product owner, delivery manager, or C-level sponsor who needs to understand what was delivered.</p>
+<p><strong>Situation:</strong> A stakeholder asks "Does our system send automated reminders?" or "What happens when an invoice is approved?"</p>
+<p><strong>Action:</strong> Translate Script mode → paste or describe the relevant area → get a plain-English explanation with no technical jargon.</p>
+
+<h3>Use Case 3 — Cross-Customer Feature Audit</h3>
+<p><strong>Who:</strong> Product team deciding which features to standardise or productise.</p>
+<p><strong>Situation:</strong> The team wants to know which customers have built automated invoicing, multi-currency support, or scheduled batch jobs.</p>
+<p><strong>Action:</strong> Feature Search mode → enter the capability → the tool scans up to 50 repositories and identifies which customers have it and how they've implemented it.</p>
+
+<h3>Use Case 4 — Competitive / Portfolio Comparison</h3>
+<p><strong>Who:</strong> Delivery director or architect reviewing consistency across customer implementations.</p>
+<p><strong>Situation:</strong> Two customers both run the same platform but have diverged significantly in their configuration and customisation.</p>
+<p><strong>Action:</strong> Cross-Customer Compare mode → select both repositories → ask "How does their business logic differ?" → receive a structured side-by-side comparison.</p>
+
+<h3>Use Case 5 — Knowledge Retention</h3>
+<p><strong>Who:</strong> Team lead or architect during a team transition.</p>
+<p><strong>Situation:</strong> A senior developer who owns all the institutional knowledge about a customer is leaving the team.</p>
+<p><strong>Action:</strong> Run a full summary of the repository before they leave. Use follow-up chat to ask about specific modules. Export the result to preserve institutional knowledge.</p>
+
+<h3>Use Case 6 — Pre-Sales / Demo Preparation</h3>
+<p><strong>Who:</strong> Pre-sales engineer or consultant preparing for a customer call.</p>
+<p><strong>Situation:</strong> 30 minutes before a call and no time for a deep-dive code review.</p>
+<p><strong>Action:</strong> Quick summary → key business processes → integrations used → walk into the meeting prepared.</p>
+
+
+<!-- ── 4. Features ── -->
+<h2 id="features"><span class="section-num">04</span>What It Can Do — Full Feature List</h2>
+
+<h3>Modes</h3>
+<table>
+  <tr><th>Mode</th><th>What it does</th><th>Best for</th></tr>
+  <tr><td><strong>Summarise Customer</strong></td><td>Reads up to 15 key files and generates a full business-level overview of what the customer's system does</td><td>Onboarding, handover, exec briefings</td></tr>
+  <tr><td><strong>Translate Script</strong></td><td>Translates code into plain-English process steps; great for walking through a specific script or module</td><td>Business analyst reviews, compliance audits</td></tr>
+  <tr><td><strong>Feature Search</strong></td><td>Scans up to 50 repositories simultaneously to identify which customers have a specific capability</td><td>Portfolio analysis, productisation decisions</td></tr>
+  <tr><td><strong>Cross-Customer Compare</strong></td><td>Compares 2 or more selected repositories side by side, highlighting business logic differences</td><td>Architecture reviews, consistency audits</td></tr>
+</table>
+
+<h3>Interaction Features</h3>
+<ul>
+  <li><strong>Streaming responses</strong> — answers appear word-by-word in real time; no waiting for the full response</li>
+  <li><strong>Follow-up chat</strong> — ask clarifying questions on any result without re-fetching the code; full conversation history maintained per card</li>
+  <li><strong>Quick prompts</strong> — one-click pre-built questions tailored to each mode</li>
+  <li><strong>Copy to clipboard</strong> — single button copies the full markdown text of any result</li>
+  <li><strong>Result history</strong> — last 20 results survive page refresh; stored in browser localStorage</li>
+  <li><strong>Token usage badge</strong> — shows input/output token counts per query for cost tracking</li>
+</ul>
+
+<h3>Repository Handling</h3>
+<ul>
+  <li><strong>Priority file selection</strong> — automatically focuses on business-logic files (.java, .py, .js, .ts, .sql, config, rules) before low-value files</li>
+  <li><strong>Skip list</strong> — ignores node_modules, minified files, lock files, binary assets automatically</li>
+  <li><strong>Path filter</strong> — narrow the file scan to a specific folder (e.g. <code>src/business/</code>)</li>
+  <li><strong>5,000-character cap per file</strong> — large files are truncated at the most relevant section</li>
+  <li><strong>Pagination support</strong> — loads all pages of repositories from GitHub (handles orgs with 100+ repos)</li>
+  <li><strong>Org and personal account</strong> — auto-detects whether the GitHub user is an org or personal account</li>
+  <li><strong>Failed file reporting</strong> — if individual files can't be read, they are listed in the result rather than silently skipped</li>
+</ul>
+
+<h3>Resilience</h3>
+<ul>
+  <li><strong>Retry with backoff</strong> — failed GitHub API calls retry up to 2 times (800ms / 1600ms delay)</li>
+  <li><strong>Rate limit indicator</strong> — header badge shows remaining GitHub API quota; warns at &lt;100, critical at &lt;10</li>
+  <li><strong>Rate limit error handling</strong> — throws a clear, timed error message when quota is exhausted (403/429)</li>
+</ul>
+
+<h3>Multi-LLM Support</h3>
+<ul>
+  <li><strong>Anthropic Claude</strong> — native Messages API with SSE streaming</li>
+  <li><strong>OpenAI GPT</strong> — Chat Completions API with SSE streaming</li>
+  <li><strong>Any OpenAI-compatible provider</strong> — Groq, Ollama, Azure OpenAI, LM Studio, or any endpoint with a custom base URL</li>
+  <li><strong>Configurable model name</strong> — full control over which model variant to use</li>
+</ul>
+
+<h3>Configuration</h3>
+<ul>
+  <li><strong>localStorage persistence</strong> — config survives page refresh</li>
+  <li><strong>Server-side config.json</strong> — pre-populate credentials for team deployments</li>
+  <li><strong>Collapsible config panel</strong> — auto-collapses after loading repos to maximise working area</li>
+</ul>
+
+
+<!-- ── 5. Architecture ── -->
+<h2 id="architecture"><span class="section-num">05</span>Technical Architecture</h2>
+
+<div class="arch-diagram">Browser
+  │
+  ├── index.html          — App shell, layout, config UI
+  ├── css/styles.css      — All styling (design system tokens, responsive)
+  └── js/app.js           — All application logic
+         │
+         ├── ConfigManager       — Reads/writes localStorage + config.json
+         │                         Manages provider, model, API key, GitHub creds
+         │
+         ├── GitHubClient        — GitHub REST API v3 calls
+         │   ├── loadRepos()       GET /orgs/:org/repos (paginated)
+         │   ├── fetchRepoFiles()  GET /repos/:org/:repo/git/trees/HEAD
+         │   │                     GET /repos/:org/:repo/contents/:path
+         │   ├── fetchWithRetry()  Exponential backoff wrapper
+         │   └── checkRateLimit()  X-RateLimit-* header parser
+         │
+         ├── LLMClient           — AI provider abstraction
+         │   └── ask()             SSE streaming for Anthropic + OpenAI
+         │
+         ├── ResultCard          — Self-contained result card DOM component
+         │   ├── beginStreaming()  Pre-wrap live text display
+         │   ├── update()          Renders markdown via DOMPurify + marked.js
+         │   ├── showTokenBadge()  Token usage display
+         │   └── copy()            Clipboard write
+         │
+         └── App                 — Orchestrator
+             ├── Modes: summarise / translate / feature / compare
+             ├── Follow-up chat  (multi-turn conversation history per card)
+             ├── Result persistence (localStorage, 20-result cap)
+             └── Event delegation (repo list clicks, no inline user-data handlers)
+
+External APIs (browser → API, no server proxy)
+  ├── api.github.com        — Repository tree + file contents
+  ├── api.anthropic.com     — Claude models (streaming)
+  └── api.openai.com        — GPT models (streaming)
+      or custom base URL    — Groq, Azure, Ollama, etc.</div>
+
+<h3>Data Flow</h3>
+<ol class="steps">
+  <li>User selects a repository from the sidebar. The app fetches the file tree from GitHub's Git Trees API.</li>
+  <li>Files are ranked by relevance (business logic files first) and the top N are fetched concurrently via the Contents API. Each file is decoded from base64 and capped at 5,000 characters.</li>
+  <li>A structured prompt is assembled: system prompt (role + instructions) + user message (repository name + file contents + the user's question).</li>
+  <li>The prompt is sent to the configured AI provider via its streaming API. The response streams back as Server-Sent Events.</li>
+  <li>The app parses SSE deltas in real time and renders them live in the result card. On completion, the full text is sanitised with DOMPurify and rendered as rich markdown.</li>
+</ol>
+
+<div class="callout">
+  <strong>No server required</strong>
+  All API calls are made directly from the browser. There is no backend, no proxy, and no database. The only server needed is a static file host (or Java application server for WAR deployment).
+</div>
+
+
+<!-- ── 6. Quick Start ── -->
+<h2 id="quick-start" class="no-break"><span class="section-num">06</span>Quick Start (Browser)</h2>
+
+<ol class="steps">
+  <li>Open <code>index.html</code> in a modern browser (Chrome, Edge, Firefox, Safari). If running from the filesystem, some browsers may block API calls — use a local server or the WAR deployment instead.</li>
+  <li>In the Configuration panel, select your AI provider (Anthropic, OpenAI, or Custom).</li>
+  <li>Enter your AI API key and optionally specify a model name (defaults are provided per provider).</li>
+  <li>Enter your GitHub Personal Access Token and your GitHub organisation or username.</li>
+  <li>Click <strong>Load Repositories</strong>. The sidebar populates with all repositories.</li>
+  <li>Select a mode tab (Summarise, Translate, Feature Search, or Compare).</li>
+  <li>Select a repository (or multiple for Compare), type a question or click a quick prompt, then click <strong>Ask</strong>.</li>
+</ol>
+
+<h3>GitHub Token Requirements</h3>
+<p>The token needs <strong>read access to repository contents and metadata</strong>. For a classic token, enable the <code>repo</code> scope (or <code>read:org</code> + <code>contents:read</code> for fine-grained tokens).</p>
+
+<div class="callout warning">
+  <strong>Note on CORS</strong>
+  The GitHub API and AI provider APIs all support browser-direct access (CORS headers are present). Anthropic requires the <code>anthropic-dangerous-direct-browser-access: true</code> header, which this app sends automatically.
+</div>
+
+
+<!-- ── 7. WAR Deployment ── -->
+<h2 id="war-deployment"><span class="section-num">07</span>WAR Deployment Guide</h2>
+
+<p>The application is already structured as a valid Java Web Application Archive. No compilation or build step is required — the WAR is assembled from static files only.</p>
+
+<h3>Repository Structure</h3>
+<pre>customer-insights/
+├── index.html              ← Application entry point
+├── css/
+│   └── styles.css
+├── js/
+│   └── app.js
+├── docs/
+│   └── guide.html          ← This document
+├── config.sample.json      ← Template — copy to config.json and populate
+├── WEB-INF/
+│   └── web.xml             ← Servlet descriptor (serves static files)
+└── README.md</pre>
+
+<h3>Step-by-Step: Package and Deploy</h3>
+
+<ol class="steps">
+  <li>
+    <div>
+      <strong>Clone the repository</strong>
+      <pre>git clone https://github.com/mohit1jindal/customer-insights.git
+cd customer-insights</pre>
+    </div>
+  </li>
+  <li>
+    <div>
+      <strong>Create your config.json</strong> (optional — enables pre-populated credentials for the whole team)
+      <pre>cp config.sample.json config.json</pre>
+      Edit <code>config.json</code> and fill in the values:
+      <pre>{
+  "anthropicKey": "sk-ant-...",
+  "githubToken":  "ghp_...",
+  "githubOrg":    "your-org-name",
+  "provider":     "anthropic",
+  "model":        "claude-sonnet-4-20250514"
+}</pre>
+      <div class="callout danger" style="margin-top:8px">
+        <strong>Security warning</strong>
+        Never commit <code>config.json</code> to git. It contains API credentials. The file is listed in <code>.gitignore</code>.
+      </div>
+    </div>
+  </li>
+  <li>
+    <div>
+      <strong>Package as a WAR</strong>
+      <pre># From the repo root directory
+jar -cvf customer-insights.war *</pre>
+      Or with Maven (if using a <code>pom.xml</code> wrapper):
+      <pre>mvn package</pre>
+    </div>
+  </li>
+  <li>
+    <div>
+      <strong>Deploy to Apache Tomcat</strong>
+      <pre># Copy WAR to Tomcat's webapps directory
+cp customer-insights.war $CATALINA_HOME/webapps/
+
+# Start or reload Tomcat
+$CATALINA_HOME/bin/startup.sh</pre>
+      Tomcat automatically unpacks the WAR. The app is then available at:
+      <pre>http://&lt;server&gt;:8080/customer-insights/</pre>
+    </div>
+  </li>
+  <li>
+    <div>
+      <strong>Deploy to JBoss / WildFly</strong>
+      <pre>cp customer-insights.war $JBOSS_HOME/standalone/deployments/</pre>
+      JBoss hot-deploys on file copy. Access at:
+      <pre>http://&lt;server&gt;:8080/customer-insights/</pre>
+    </div>
+  </li>
+  <li>
+    <div>
+      <strong>Deploy to WebLogic</strong>
+      Use the WebLogic Administration Console → Deployments → Install → upload the WAR file. Set the context root to <code>/customer-insights</code>.
+    </div>
+  </li>
+  <li>
+    <div>
+      <strong>Deploy to WebSphere</strong>
+      In the WebSphere Administration Console: Applications → New Application → New Enterprise Application → upload WAR → set context root to <code>/customer-insights</code>.
+    </div>
+  </li>
+</ol>
+
+<h3>WEB-INF/web.xml</h3>
+<p>The included <code>web.xml</code> configures the application to serve all files via the default servlet, enabling direct URL access to <code>index.html</code>:</p>
+<pre>&lt;?xml version="1.0" encoding="UTF-8"?&gt;
+&lt;web-app xmlns="https://jakarta.ee/xml/ns/jakartaee"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="https://jakarta.ee/xml/ns/jakartaee
+                             https://jakarta.ee/xml/ns/jakartaee/web-app_6_0.xsd"
+         version="6.0"&gt;
+  &lt;display-name&gt;Customer Insights&lt;/display-name&gt;
+  &lt;welcome-file-list&gt;
+    &lt;welcome-file&gt;index.html&lt;/welcome-file&gt;
+  &lt;/welcome-file-list&gt;
+&lt;/web-app&gt;</pre>
+
+<h3>Reverse Proxy (Nginx)</h3>
+<p>For production use, place Nginx in front of Tomcat to handle TLS:</p>
+<pre>server {
+    listen 443 ssl;
+    server_name insights.yourcompany.com;
+    ssl_certificate     /etc/ssl/certs/your-cert.crt;
+    ssl_certificate_key /etc/ssl/private/your-key.key;
+
+    location /customer-insights/ {
+        proxy_pass http://127.0.0.1:8080/customer-insights/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+}</pre>
+
+<div class="callout warning">
+  <strong>HTTPS requirement</strong>
+  The <code>navigator.clipboard</code> API (used by the Copy button) requires HTTPS. In production, always deploy behind TLS.
+</div>
+
+<h3>GitHub Pages (Alternative — No Server Required)</h3>
+<p>If you don't need a config.json pre-populated, the app runs directly on GitHub Pages:</p>
+<ol>
+  <li>Push the repo to GitHub (already done for <code>mohit1jindal/customer-insights</code>).</li>
+  <li>In repository Settings → Pages, set source to <code>main</code> branch, root folder.</li>
+  <li>The app is live at <code>https://&lt;username&gt;.github.io/customer-insights/</code>.</li>
+</ol>
+
+
+<!-- ── 8. Config Reference ── -->
+<h2 id="config-reference"><span class="section-num">08</span>Configuration Reference</h2>
+
+<h3>UI Fields</h3>
+<table>
+  <tr><th>Field</th><th>Description</th><th>Required</th></tr>
+  <tr><td><code>AI Provider</code></td><td>Select Anthropic, OpenAI, or Custom (OpenAI-compatible)</td><td>Yes</td></tr>
+  <tr><td><code>Base URL</code></td><td>Only shown for Custom provider. Full base URL of the API (e.g. <code>https://api.groq.com/openai/v1</code>)</td><td>Custom only</td></tr>
+  <tr><td><code>Model</code></td><td>Model identifier. Autocomplete suggestions shown per provider. Defaults to provider's recommended model if left blank.</td><td>No</td></tr>
+  <tr><td><code>API Key</code></td><td>API key for the selected AI provider</td><td>Yes</td></tr>
+  <tr><td><code>GitHub Token</code></td><td>Personal Access Token with repo read access</td><td>Yes</td></tr>
+  <tr><td><code>GitHub Org / User</code></td><td>Organisation name or personal username on GitHub</td><td>Yes</td></tr>
+</table>
+
+<h3>config.json (Server Deployment)</h3>
+<table>
+  <tr><th>Key</th><th>Type</th><th>Description</th></tr>
+  <tr><td><code>anthropicKey</code></td><td>string</td><td>AI provider API key (used regardless of provider name)</td></tr>
+  <tr><td><code>githubToken</code></td><td>string</td><td>GitHub PAT</td></tr>
+  <tr><td><code>githubOrg</code></td><td>string</td><td>GitHub organisation or username</td></tr>
+  <tr><td><code>provider</code></td><td>string</td><td><code>anthropic</code> | <code>openai</code> | <code>custom</code></td></tr>
+  <tr><td><code>model</code></td><td>string</td><td>Model identifier (optional)</td></tr>
+  <tr><td><code>baseUrl</code></td><td>string</td><td>Custom provider base URL (optional)</td></tr>
+</table>
+
+<h3>Default Models</h3>
+<table>
+  <tr><th>Provider</th><th>Default model</th><th>Recommended for</th></tr>
+  <tr><td>Anthropic</td><td><code>claude-sonnet-4-20250514</code></td><td>Best balance of quality and speed</td></tr>
+  <tr><td>OpenAI</td><td><code>gpt-4o</code></td><td>GPT flagship model</td></tr>
+  <tr><td>Custom</td><td>(none — must be specified)</td><td>Groq, Azure, Ollama, LM Studio</td></tr>
+</table>
+
+<h3>Example: Groq (Custom Provider)</h3>
+<pre>{
+  "provider":    "custom",
+  "baseUrl":     "https://api.groq.com/openai/v1",
+  "anthropicKey": "gsk_...",
+  "model":       "llama-3.3-70b-versatile",
+  "githubToken": "ghp_...",
+  "githubOrg":   "your-org"
+}</pre>
+
+
+<!-- ── 9. Security ── -->
+<h2 id="security"><span class="section-num">09</span>Security Considerations</h2>
+
+<h3>Fixes Applied in v5</h3>
+<table>
+  <tr><th>Issue</th><th>Risk</th><th>Fix</th></tr>
+  <tr>
+    <td>Repo names injected raw into <code>innerHTML</code> and <code>onclick</code></td>
+    <td>XSS — a maliciously named repo could inject scripts</td>
+    <td>All user-derived strings passed through <code>escapeHtml()</code> before HTML insertion. Repo list uses event delegation + <code>data-repo</code> attributes instead of inline onclick with user data.</td>
+  </tr>
+  <tr>
+    <td>LLM output rendered via <code>marked.parse()</code> directly into <code>innerHTML</code></td>
+    <td>XSS — if the LLM returns <code>&lt;script&gt;</code> or crafted HTML in its response</td>
+    <td>All markdown output is passed through <code>DOMPurify.sanitize()</code> before being set as innerHTML.</td>
+  </tr>
+  <tr>
+    <td>GitHub API error messages injected into <code>innerHTML</code></td>
+    <td>XSS — API error body could contain HTML</td>
+    <td><code>escapeHtml(e.message)</code> applied before all DOM insertion.</td>
+  </tr>
+  <tr>
+    <td>GitHub API URLs constructed without encoding</td>
+    <td>Path injection — org/repo names with special characters could alter API endpoint</td>
+    <td>All dynamic URL segments wrapped in <code>encodeURIComponent()</code>.</td>
+  </tr>
+</table>
+
+<h3>API Key Handling</h3>
+<ul>
+  <li>Keys are stored in <strong>browser localStorage</strong> — scoped to the origin, not sent anywhere except the intended API endpoints.</li>
+  <li>Keys are never logged, never sent to any third-party service, and never appear in URLs.</li>
+  <li>For server deployments using <code>config.json</code>: ensure the file is <strong>not accessible publicly</strong> if deployed on a shared or internet-facing server. Use Nginx/Apache rules to block direct access to <code>config.json</code>.</li>
+  <li>Recommended: use a dedicated read-only GitHub token scoped to specific repositories.</li>
+</ul>
+
+<h3>Blocking config.json in Nginx</h3>
+<pre>location = /customer-insights/config.json {
+    deny all;
+    return 403;
+}</pre>
+
+<h3>Content Security Policy (Recommended)</h3>
+<pre>Content-Security-Policy:
+  default-src 'self';
+  script-src 'self' https://cdn.jsdelivr.net;
+  connect-src 'self'
+              https://api.github.com
+              https://api.anthropic.com
+              https://api.openai.com;
+  style-src 'self' https://fonts.googleapis.com;
+  font-src https://fonts.gstatic.com;</pre>
+
+<h3>HTTPS</h3>
+<p>Always deploy behind HTTPS in production. The <code>navigator.clipboard</code> API, secure cookies, and some browser security policies require a secure context.</p>
+
+
+<!-- ── 10. OOP Design ── -->
+<h2 id="oop-design"><span class="section-num">10</span>Object-Oriented Design</h2>
+
+<p>Version 5 refactored the entire application from a flat procedural script into a class-based architecture with clear separation of concerns.</p>
+
+<h3>Class Hierarchy</h3>
+<table>
+  <tr><th>Class</th><th>Responsibility</th><th>Key methods</th></tr>
+  <tr>
+    <td><code>ConfigManager</code></td>
+    <td>Encapsulates all configuration state: reading/writing localStorage, loading config.json, managing the config panel UI, and exposing provider/key/model as typed getters.</td>
+    <td><code>save()</code>, <code>load()</code>, <code>loadFromServer()</code>, <code>onProviderChange()</code>, <code>togglePanel()</code>, <code>setStatus()</code></td>
+  </tr>
+  <tr>
+    <td><code>GitHubClient</code></td>
+    <td>All GitHub REST API communication. Handles authentication headers, pagination, rate limit monitoring, retry logic, and file content decoding. No UI logic.</td>
+    <td><code>loadRepos()</code>, <code>fetchRepoFiles()</code>, <code>fetchWithRetry()</code>, <code>checkRateLimit()</code></td>
+  </tr>
+  <tr>
+    <td><code>LLMClient</code></td>
+    <td>AI provider abstraction. Handles both Anthropic and OpenAI streaming protocols (SSE), parses token usage, and exposes a single unified <code>ask()</code> interface regardless of provider.</td>
+    <td><code>ask(systemPrompt, messages, onChunk, onComplete)</code></td>
+  </tr>
+  <tr>
+    <td><code>ResultCard</code></td>
+    <td>Self-contained DOM component for a single query result. Owns its own element creation, streaming state, markdown rendering, token badge, copy functionality, and serialisation for persistence.</td>
+    <td><code>beginStreaming()</code>, <code>update()</code>, <code>showTokenBadge()</code>, <code>copy()</code>, <code>toJSON()</code></td>
+  </tr>
+  <tr>
+    <td><code>App</code></td>
+    <td>Top-level orchestrator. Holds application state (selected repo, mode, compare set, card registry). Coordinates GitHubClient → LLMClient → ResultCard pipelines. Manages event delegation and localStorage persistence.</td>
+    <td><code>init()</code>, <code>runQuery()</code>, <code>sendFollowUp()</code>, <code>loadRepos()</code>, <code>setMode()</code>, <code>clearHistory()</code></td>
+  </tr>
+</table>
+
+<h3>OOP Principles Applied</h3>
+<ul>
+  <li><strong>Single Responsibility</strong> — each class has one clear job. <code>GitHubClient</code> doesn't know about markdown; <code>LLMClient</code> doesn't know about GitHub.</li>
+  <li><strong>Encapsulation</strong> — internal helpers are prefixed with <code>_</code> (e.g. <code>_renderRepoList</code>, <code>_setBusy</code>). State (<code>_allRepos</code>, <code>_cards</code>) is held on the instance, not in global variables.</li>
+  <li><strong>Composition over inheritance</strong> — <code>App</code> owns instances of <code>ConfigManager</code>, <code>GitHubClient</code>, and <code>LLMClient</code>, delegating to each rather than extending them.</li>
+  <li><strong>Dependency injection</strong> — <code>GitHubClient</code> and <code>LLMClient</code> both receive a <code>ConfigManager</code> reference at construction time, making their configuration source explicit and testable.</li>
+  <li><strong>Thin global shims</strong> — HTML <code>onclick</code> attributes call single-line global wrapper functions (e.g. <code>function runQuery() { app.runQuery(); }</code>) that delegate immediately to the class. This keeps all business logic inside the class hierarchy.</li>
+</ul>
+
+
+<!-- ── 11. Limitations ── -->
+<h2 id="limitations"><span class="section-num">11</span>Known Limitations</h2>
+
+<table>
+  <tr><th>Limitation</th><th>Detail</th><th>Workaround</th></tr>
+  <tr>
+    <td>File cap per query</td>
+    <td>Reads at most 15–20 files per repository per query (ranked by relevance). Very large or unusual code structures may miss important files.</td>
+    <td>Use the Path Filter to focus on a specific folder, reducing noise and surfacing the right files.</td>
+  </tr>
+  <tr>
+    <td>Character cap per file</td>
+    <td>Each file is truncated at 5,000 characters. Very large files (e.g. a single 10,000-line monolith) are partially read.</td>
+    <td>Split large files into modules, or use the path filter to target the most relevant section.</td>
+  </tr>
+  <tr>
+    <td>Binary and generated files</td>
+    <td>Images, PDFs, compiled outputs, and minified files are automatically skipped. Configuration stored in binary formats (e.g. encrypted property files) cannot be read.</td>
+    <td>Ensure configuration is stored in text-based formats (YAML, JSON, properties).</td>
+  </tr>
+  <tr>
+    <td>GitHub API rate limits</td>
+    <td>The unauthenticated limit is 60 req/hr; authenticated is 5,000 req/hr. Feature Search across 50 repos can consume ~150–500 requests depending on repo size.</td>
+    <td>Monitor the rate limit indicator in the header. Use a dedicated service account token for team deployments.</td>
+  </tr>
+  <tr>
+    <td>No branch selection</td>
+    <td>Always reads from the default branch (HEAD). Feature branches or release branches are not accessible.</td>
+    <td>Merge changes to main before querying, or manually change the HEAD reference.</td>
+  </tr>
+  <tr>
+    <td>Context window limits</td>
+    <td>Very large multi-repo comparisons may approach LLM context limits (especially with smaller models). Quality degrades as context fills.</td>
+    <td>Use compare mode with 2–3 repositories at a time rather than many simultaneously.</td>
+  </tr>
+  <tr>
+    <td>No offline support</td>
+    <td>Requires live internet access for GitHub API and LLM API calls. No caching of repository content.</td>
+    <td>N/A — by design. Use a self-hosted Ollama endpoint if operating in a restricted network.</td>
+  </tr>
+  <tr>
+    <td>No authentication / authorisation</td>
+    <td>When deployed as a WAR with config.json, any user who can reach the URL can use the pre-configured credentials.</td>
+    <td>Deploy behind SSO/VPN, or leave config.json empty and require each user to supply their own credentials.</td>
+  </tr>
+</table>
+
+<hr/>
+
+<p style="text-align:center; color: var(--ink3); font-size: 12px; font-family: var(--mono); margin-top: 32px;">
+  Customer Insights · v5.0 · github.com/mohit1jindal/customer-insights
+</p>
+
+</body>
+</html>
