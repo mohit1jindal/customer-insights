@@ -91,7 +91,7 @@ class ConfigManager {
       if (!res.ok) return false;
       const cfg = await res.json();
       if (!cfg.anthropicKey && !cfg.githubToken && !cfg.githubOrg) return false;
-      if (cfg.anthropicKey) this._el('anthropic-key').value = cfg.anthropicKey;
+      if (cfg.apiKey || cfg.anthropicKey) this._el('anthropic-key').value = cfg.apiKey || cfg.anthropicKey;
       if (cfg.githubToken)  this._el('github-token').value  = cfg.githubToken;
       if (cfg.githubOrg)    this._el('github-org').value    = cfg.githubOrg;
       if (cfg.provider)     this._el('provider').value      = cfg.provider;
