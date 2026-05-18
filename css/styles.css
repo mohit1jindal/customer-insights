@@ -506,3 +506,89 @@ textarea::placeholder { color: var(--ink3); }
 .result-body tr:nth-child(even) td { background: var(--paper2); }
 .result-body blockquote { border-left: 3px solid var(--accent); margin: 0.8em 0; padding: 4px 12px; color: var(--ink2); font-style: italic; }
 .result-body hr { border: none; border-top: 1px solid var(--border); margin: 1em 0; }
+
+/* Result actions (copy button + time) */
+.result-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.copy-btn {
+  font-family: var(--mono);
+  font-size: 11px;
+  padding: 3px 10px;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  background: var(--paper);
+  color: var(--ink3);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.copy-btn:hover { background: var(--paper3); color: var(--ink); border-color: var(--ink3); }
+.copy-btn.copied { background: rgba(42,122,74,0.1); color: var(--success); border-color: var(--success); }
+
+/* Follow-up chat section */
+.followup-section {
+  border-top: 1px solid var(--border2);
+}
+.followup-thread {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+.followup-question {
+  padding: 10px 16px;
+  background: var(--paper2);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink);
+  border-top: 1px solid var(--border2);
+}
+.followup-question::before {
+  content: '↳ ';
+  color: var(--accent);
+  font-family: var(--mono);
+}
+.followup-answer {
+  padding: 12px 16px;
+  font-size: 14px;
+  line-height: 1.75;
+  color: var(--ink);
+  border-top: 1px solid var(--border2);
+}
+.followup-answer.loading {
+  color: var(--ink3);
+  font-style: italic;
+}
+.followup-row {
+  display: flex;
+  gap: 6px;
+  padding: 10px 16px;
+  border-top: 1px solid var(--border2);
+  background: var(--paper2);
+}
+.followup-input {
+  flex: 1;
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--paper);
+  font-family: var(--sans);
+  font-size: 13px;
+  color: var(--ink);
+  outline: none;
+  transition: border-color 0.2s;
+}
+.followup-input:focus { border-color: var(--accent); }
+.followup-input::placeholder { color: var(--ink3); }
+.followup-send {
+  padding: 7px 14px;
+  background: var(--paper3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 13px;
+  color: var(--ink2);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.followup-send:hover { background: var(--accent); color: white; border-color: var(--accent); }
