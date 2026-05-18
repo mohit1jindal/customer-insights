@@ -414,9 +414,9 @@ function updateResultCard(card, text, isError) {
   body.classList.remove('loading');
   if (isError) {
     body.style.color = '#c0392b';
-    body.textContent = text;
+    body.innerHTML = marked.parse(text);
   } else {
-    body.textContent = text;
+    body.innerHTML = marked.parse(text);
   }
 }
 
