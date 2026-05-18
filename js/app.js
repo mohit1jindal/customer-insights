@@ -48,8 +48,6 @@ function loadConfig() {
   updateStatus();
 }
 
-// Fetches config.json from the server and populates credentials.
-// Returns true if credentials were loaded, false to fall back to localStorage.
 async function loadServerConfig() {
   try {
     const res = await fetch('config.json');
@@ -60,7 +58,6 @@ async function loadServerConfig() {
     if (cfg.githubToken)  document.getElementById('github-token').value  = cfg.githubToken;
     if (cfg.githubOrg)    document.getElementById('github-org').value    = cfg.githubOrg;
     updateStatus();
-    // Collapse config panel — credentials pre-loaded from server
     configVisible = false;
     document.getElementById('config-body').classList.add('hidden');
     document.getElementById('config-chevron').textContent = '▶';
@@ -253,7 +250,8 @@ async function fetchRepoFiles(repoName, maxFiles = 20) {
 }
 
 // ── Claude API ──
-async function askClaude(systemPrompt, userMessage) {
+// messages is an array of {role, content} to support multi-turn follow-up
+async function askClaude(systemPrompt, messages) {
   const key = document.getElementById('anthropic-key').value;
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
@@ -262,7 +260,7 @@ async function askClaude(systemPrompt, userMessage) {
       model: 'claude-sonnet-4-20250514',
       max_tokens: 4096,
       system: systemPrompt,
-      messages: [{ role: 'user', content: userMessage }]
+      messages: messages
     })
   });
   if (!res.ok) {
@@ -285,7 +283,7 @@ async function runQuery() {
   if (currentMode === 'compare') { await runCompare(query); return; }
   if (!selectedRepo) { alert('Please select a customer from the sidebar first.'); return; }
 
-  const card = addResultCard(selectedRepo, currentMode === 'summarise' ? 'Summary' : 'Translation', true);
+  const card = addResultCard(selectedRepo, currentMode === 'summarise' ? 'Summary' : 'Translation');
   document.getElementById('send-btn').disabled = true;
   document.getElementById('status-dot').className = 'dot loading';
   document.getElementById('status-text').textContent = 'fetching code...';
@@ -298,10 +296,10 @@ async function runQuery() {
       ? `You are a business analyst assistant. Your job is to read source code and explain what the system does in clear, plain English — suitable for a non-technical business stakeholder or project manager. Focus on: what business problems the system solves, the main business processes and workflows, key business rules or logic, integrations with other systems, and what data flows in and out. Use business language, not technical jargon. Structure your answer with clear headings.`
       : `You are a business analyst assistant. Translate the provided source code into plain English business language. Explain what each script or module does in terms of business processes, rules, and outcomes. A non-technical manager should be able to fully understand what this code does after reading your explanation. Avoid technical terms — if you must use one, explain it. Use bullet points and short paragraphs.`;
 
-    const answer = await askClaude(systemPrompt,
-      `Customer repository: ${selectedRepo}\n\nCode files:\n${code}\n\nQuestion: ${query}`
-    );
-    updateResultCard(card, answer);
+    const userMessage = `Customer repository: ${selectedRepo}\n\nCode files:\n${code}\n\nQuestion: ${query}`;
+    const messages = [{ role: 'user', content: userMessage }];
+    const answer = await askClaude(systemPrompt, messages);
+    updateResultCard(card, answer, false, systemPrompt, [...messages, { role: 'assistant', content: answer }]);
   } catch(e) {
     updateResultCard(card, `Error: ${e.message}`, true);
   }
@@ -318,7 +316,7 @@ async function runFeatureSearch(query) {
   const token = document.getElementById('github-token').value;
   if (!key || !token) { alert('Configure API keys first.'); return; }
 
-  const card = addResultCard('All customers', 'Feature Search', true);
+  const card = addResultCard('All customers', 'Feature Search');
   document.getElementById('send-btn').disabled = true;
   document.getElementById('status-dot').className = 'dot loading';
 
@@ -335,11 +333,9 @@ async function runFeatureSearch(query) {
 
     document.getElementById('status-text').textContent = 'asking Claude...';
 
-    const answer = await askClaude(
-      `You are a business analyst. You are given code snippets from multiple customer repositories. Answer the user's question by identifying which customers have the requested feature or capability. Be specific — name the customers and explain what you found in their code. Speak in business language.`,
-      `Question: ${query}\n\nCustomer repositories:\n\n${summaries.join('\n\n---\n\n')}`
-    );
-    updateResultCard(card, answer);
+    const systemPrompt = `You are a business analyst. You are given code snippets from multiple customer repositories. Answer the user's question by identifying which customers have the requested feature or capability. Be specific — name the customers and explain what you found in their code. Speak in business language.`;
+    const answer = await askClaude(systemPrompt, [{ role: 'user', content: `Question: ${query}\n\nCustomer repositories:\n\n${summaries.join('\n\n---\n\n')}` }]);
+    updateResultCard(card, answer, false, null, null);
   } catch(e) {
     updateResultCard(card, `Error: ${e.message}`, true);
   }
@@ -357,7 +353,7 @@ async function runCompare(query) {
   if (!key) { alert('Configure API keys first.'); return; }
 
   const customers = Array.from(selectedForCompare);
-  const card = addResultCard(customers.join(' vs '), 'Comparison', true);
+  const card = addResultCard(customers.join(' vs '), 'Comparison');
   document.getElementById('compare-btn').disabled = true;
   document.getElementById('send-btn').disabled = true;
   document.getElementById('status-dot').className = 'dot loading';
@@ -371,11 +367,11 @@ async function runCompare(query) {
 
     document.getElementById('status-text').textContent = 'asking Claude...';
 
-    const answer = await askClaude(
-      `You are a business analyst comparing multiple customer implementations. Explain the similarities and differences between their business logic, processes, and capabilities in plain English. Use a structured format with clear sections. Focus on business impact, not technical details.`,
-      `Question: ${query || 'Compare the business logic and processes of these customers.'}\n\nCustomer repositories:\n\n${codes.join('\n\n---\n\n')}`
-    );
-    updateResultCard(card, answer);
+    const systemPrompt = `You are a business analyst comparing multiple customer implementations. Explain the similarities and differences between their business logic, processes, and capabilities in plain English. Use a structured format with clear sections. Focus on business impact, not technical details.`;
+    const userMessage = `Question: ${query || 'Compare the business logic and processes of these customers.'}\n\nCustomer repositories:\n\n${codes.join('\n\n---\n\n')}`;
+    const messages = [{ role: 'user', content: userMessage }];
+    const answer = await askClaude(systemPrompt, messages);
+    updateResultCard(card, answer, false, systemPrompt, [...messages, { role: 'assistant', content: answer }]);
   } catch(e) {
     updateResultCard(card, `Error: ${e.message}`, true);
   }
@@ -387,10 +383,11 @@ async function runCompare(query) {
 }
 
 // ── Result cards ──
-function addResultCard(customer, mode, loading) {
+function addResultCard(customer, mode) {
   document.getElementById('empty-state')?.remove();
   const results = document.getElementById('results');
   const time = new Date().toLocaleTimeString();
+  const id = String(Date.now());
   const card = document.createElement('div');
   card.className = 'result-card';
   card.innerHTML = `
@@ -399,16 +396,29 @@ function addResultCard(customer, mode, loading) {
         <span class="result-customer">${customer}</span>
         <span class="result-mode">${mode}</span>
       </div>
-      <span class="result-time">${time}</span>
+      <div class="result-actions">
+        <button class="copy-btn" id="cb-${id}" onclick="copyResult('${id}')" style="display:none">Copy</button>
+        <span class="result-time">${time}</span>
+      </div>
     </div>
-    <div class="result-body loading" id="rb-${Date.now()}">⟳ Loading — fetching code and translating to business language...</div>
+    <div class="result-body loading" id="rb-${id}">⟳ Loading — fetching code and translating to business language...</div>
+    <div class="followup-section" id="fu-${id}" style="display:none">
+      <div class="followup-thread" id="ft-${id}"></div>
+      <div class="followup-row">
+        <input type="text" class="followup-input" id="fi-${id}"
+               placeholder="Ask a follow-up question..."
+               onkeydown="if(event.key==='Enter')sendFollowUp('${id}')"/>
+        <button class="followup-send" onclick="sendFollowUp('${id}')">→</button>
+      </div>
+    </div>
   `;
   results.prepend(card);
-  card._bodyId = card.querySelector('.result-body').id;
+  card._id = id;
+  card._bodyId = `rb-${id}`;
   return card;
 }
 
-function updateResultCard(card, text, isError) {
+function updateResultCard(card, text, isError, systemPrompt, messages) {
   const body = document.getElementById(card._bodyId);
   if (!body) return;
   body.classList.remove('loading');
@@ -417,11 +427,73 @@ function updateResultCard(card, text, isError) {
     body.innerHTML = marked.parse(text);
   } else {
     body.innerHTML = marked.parse(text);
+    card._rawText = text;
+    card._systemPrompt = systemPrompt || null;
+    card._messages = messages || null;
+    document.getElementById(`cb-${card._id}`).style.display = 'inline-flex';
+    if (systemPrompt && messages) {
+      document.getElementById(`fu-${card._id}`).style.display = 'block';
+    }
   }
 }
 
+// ── Follow-up chat ──
+async function sendFollowUp(id) {
+  const card = [...document.querySelectorAll('.result-card')].find(c => c._id === id);
+  if (!card || !card._messages) return;
+
+  const input = document.getElementById(`fi-${id}`);
+  const question = input.value.trim();
+  if (!question) return;
+
+  input.value = '';
+  input.disabled = true;
+
+  const thread = document.getElementById(`ft-${id}`);
+
+  const qDiv = document.createElement('div');
+  qDiv.className = 'followup-question';
+  qDiv.textContent = question;
+  thread.appendChild(qDiv);
+
+  const aDiv = document.createElement('div');
+  aDiv.className = 'followup-answer loading';
+  aDiv.textContent = '⟳ Thinking...';
+  thread.appendChild(aDiv);
+  aDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+  const messages = [...card._messages, { role: 'user', content: question }];
+
+  try {
+    const answer = await askClaude(card._systemPrompt, messages);
+    aDiv.classList.remove('loading');
+    aDiv.innerHTML = marked.parse(answer);
+    card._messages = [...messages, { role: 'assistant', content: answer }];
+    card._rawText += `\n\n---\n\n**Follow-up:** ${question}\n\n${answer}`;
+  } catch(e) {
+    aDiv.classList.remove('loading');
+    aDiv.style.color = '#c0392b';
+    aDiv.textContent = `Error: ${e.message}`;
+  }
+
+  input.disabled = false;
+  input.focus();
+}
+
+// ── Copy to clipboard ──
+function copyResult(id) {
+  const card = [...document.querySelectorAll('.result-card')].find(c => c._id === id);
+  if (!card || !card._rawText) return;
+  navigator.clipboard.writeText(card._rawText).then(() => {
+    const btn = document.getElementById(`cb-${id}`);
+    const orig = btn.textContent;
+    btn.textContent = 'Copied!';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = orig; btn.classList.remove('copied'); }, 2000);
+  });
+}
+
 // ── Init ──
-// Try loading credentials from config.json first; fall back to localStorage.
 (async () => {
   const fromServer = await loadServerConfig();
   if (!fromServer) loadConfig();
