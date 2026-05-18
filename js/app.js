@@ -5,6 +5,18 @@ let selectedForCompare = new Set();
 let currentMode = 'summarise';
 let configVisible = true;
 
+// ── Provider config ──
+const PROVIDER_DEFAULTS = {
+  anthropic: { placeholder: 'sk-ant-...', model: 'claude-sonnet-4-20250514' },
+  openai:    { placeholder: 'sk-...',     model: 'gpt-4o' },
+  custom:    { placeholder: 'Your API key', model: '' },
+};
+const MODEL_SUGGESTIONS = {
+  anthropic: ['claude-sonnet-4-20250514', 'claude-opus-4-7', 'claude-haiku-4-5-20251001'],
+  openai:    ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo', 'gpt-3.5-turbo'],
+  custom:    [],
+};
+
 // ── Prompts per mode ──
 const QUICK_PROMPTS = {
   summarise: [
@@ -36,15 +48,22 @@ const QUICK_PROMPTS = {
 // ── Config persistence ──
 function saveConfig() {
   localStorage.setItem('ci_anthropic', document.getElementById('anthropic-key').value);
-  localStorage.setItem('ci_github', document.getElementById('github-token').value);
-  localStorage.setItem('ci_org', document.getElementById('github-org').value);
+  localStorage.setItem('ci_github',    document.getElementById('github-token').value);
+  localStorage.setItem('ci_org',       document.getElementById('github-org').value);
+  localStorage.setItem('ci_provider',  document.getElementById('provider').value);
+  localStorage.setItem('ci_model',     document.getElementById('model-name').value);
+  localStorage.setItem('ci_base_url',  document.getElementById('base-url').value);
   updateStatus();
 }
 
 function loadConfig() {
   document.getElementById('anthropic-key').value = localStorage.getItem('ci_anthropic') || '';
-  document.getElementById('github-token').value = localStorage.getItem('ci_github') || '';
-  document.getElementById('github-org').value = localStorage.getItem('ci_org') || '';
+  document.getElementById('github-token').value  = localStorage.getItem('ci_github')    || '';
+  document.getElementById('github-org').value    = localStorage.getItem('ci_org')       || '';
+  document.getElementById('provider').value      = localStorage.getItem('ci_provider')  || 'anthropic';
+  document.getElementById('model-name').value    = localStorage.getItem('ci_model')     || '';
+  document.getElementById('base-url').value      = localStorage.getItem('ci_base_url')  || '';
+  onProviderChange(false);
   updateStatus();
 }
 
@@ -57,6 +76,10 @@ async function loadServerConfig() {
     if (cfg.anthropicKey) document.getElementById('anthropic-key').value = cfg.anthropicKey;
     if (cfg.githubToken)  document.getElementById('github-token').value  = cfg.githubToken;
     if (cfg.githubOrg)    document.getElementById('github-org').value    = cfg.githubOrg;
+    if (cfg.provider)     document.getElementById('provider').value      = cfg.provider;
+    if (cfg.model)        document.getElementById('model-name').value    = cfg.model;
+    if (cfg.baseUrl)      document.getElementById('base-url').value      = cfg.baseUrl;
+    onProviderChange(false);
     updateStatus();
     configVisible = false;
     document.getElementById('config-body').classList.add('hidden');
@@ -67,13 +90,29 @@ async function loadServerConfig() {
   }
 }
 
+function onProviderChange(doSave = true) {
+  const provider = document.getElementById('provider').value;
+  const def = PROVIDER_DEFAULTS[provider] || PROVIDER_DEFAULTS.custom;
+
+  document.getElementById('base-url-group').style.display = provider === 'custom' ? 'block' : 'none';
+  document.getElementById('anthropic-key').placeholder = def.placeholder;
+
+  const modelInput = document.getElementById('model-name');
+  if (!modelInput.value) modelInput.placeholder = def.model || 'model-name';
+
+  const datalist = document.getElementById('model-suggestions');
+  datalist.innerHTML = (MODEL_SUGGESTIONS[provider] || []).map(m => `<option value="${m}">`).join('');
+
+  if (doSave) saveConfig();
+}
+
 function updateStatus() {
-  const hasAnthro = !!document.getElementById('anthropic-key').value;
-  const hasGH = !!document.getElementById('github-token').value;
-  const hasOrg = !!document.getElementById('github-org').value;
+  const hasKey  = !!document.getElementById('anthropic-key').value;
+  const hasGH   = !!document.getElementById('github-token').value;
+  const hasOrg  = !!document.getElementById('github-org').value;
   const dot = document.getElementById('status-dot');
   const txt = document.getElementById('status-text');
-  if (hasAnthro && hasGH && hasOrg) {
+  if (hasKey && hasGH && hasOrg) {
     dot.className = 'dot ready';
     txt.textContent = 'configured';
   } else {
@@ -88,10 +127,10 @@ function toggleConfig() {
   document.getElementById('config-chevron').textContent = configVisible ? '▼' : '▶';
 }
 
-// ── Load repos ── [fix #7: fetch all repos, not just private]
+// ── Load repos ──
 async function loadRepos() {
   const token = document.getElementById('github-token').value;
-  const org = document.getElementById('github-org').value.trim();
+  const org   = document.getElementById('github-org').value.trim();
   if (!token || !org) { alert('Enter GitHub token and org/user name first.'); return; }
 
   const list = document.getElementById('repo-list');
@@ -102,13 +141,16 @@ async function loadRepos() {
     allRepos = [];
     let page = 1;
     while (true) {
-      const url = `https://api.github.com/orgs/${org}/repos?per_page=100&page=${page}&type=all`;
-      const res = await fetchWithRetry(url, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json' } });
+      const res = await fetchWithRetry(
+        `https://api.github.com/orgs/${org}/repos?per_page=100&page=${page}&type=all`,
+        { headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json' } }
+      );
       checkRateLimit(res);
       if (!res.ok) {
-        const res2 = await fetchWithRetry(`https://api.github.com/user/repos?per_page=100&page=${page}`, {
-          headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json' }
-        });
+        const res2 = await fetchWithRetry(
+          `https://api.github.com/user/repos?per_page=100&page=${page}`,
+          { headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json' } }
+        );
         checkRateLimit(res2);
         if (!res2.ok) throw new Error(`GitHub API error: ${res2.status}`);
         const data = await res2.json();
@@ -135,27 +177,23 @@ async function loadRepos() {
 function renderRepoList(repos) {
   const list = document.getElementById('repo-list');
   if (!repos.length) { list.innerHTML = '<div class="repo-empty">No repositories found.</div>'; return; }
-
   list.innerHTML = repos.map(r => {
     if (currentMode === 'compare') {
       const checked = selectedForCompare.has(r.name) ? 'checked' : '';
       return `<label class="repo-item ${selectedForCompare.has(r.name)?'active':''}">
         <input type="checkbox" ${checked} onchange="toggleCompare('${r.name}', this.checked)"/>
-        <span class="repo-icon">◉</span>
-        <span>${r.name}</span>
+        <span class="repo-icon">◉</span><span>${r.name}</span>
       </label>`;
     }
     return `<div class="repo-item ${selectedRepo===r.name?'active':''}" onclick="selectRepo('${r.name}')">
-      <span class="repo-icon">◎</span>
-      <span>${r.name}</span>
+      <span class="repo-icon">◎</span><span>${r.name}</span>
     </div>`;
   }).join('');
 }
 
 function filterRepos() {
   const q = document.getElementById('repo-search').value.toLowerCase();
-  const filtered = allRepos.filter(r => r.name.toLowerCase().includes(q));
-  renderRepoList(filtered);
+  renderRepoList(allRepos.filter(r => r.name.toLowerCase().includes(q)));
 }
 
 function selectRepo(name) {
@@ -183,7 +221,6 @@ function setMode(mode) {
   document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.mode === mode));
   document.getElementById('compare-bar').style.display = mode === 'compare' ? 'block' : 'none';
   document.getElementById('feature-note').style.display = mode === 'feature' ? 'block' : 'none';
-  // [fix #8] show path filter only for summarise/translate
   document.getElementById('path-filter-row').style.display = (mode === 'summarise' || mode === 'translate') ? 'flex' : 'none';
   renderQuickPrompts();
   updatePlaceholder();
@@ -197,9 +234,7 @@ function renderQuickPrompts() {
   ).join('');
 }
 
-function usePrompt(el) {
-  document.getElementById('query-input').value = el.textContent;
-}
+function usePrompt(el) { document.getElementById('query-input').value = el.textContent; }
 
 function updatePlaceholder() {
   const ta = document.getElementById('query-input');
@@ -214,24 +249,23 @@ function updatePlaceholder() {
   }
 }
 
-// ── Retry helper [fix #13] ──
+// ── Retry helper ──
 async function fetchWithRetry(url, opts, retries = 2) {
   for (let i = 0; i <= retries; i++) {
-    try {
-      return await fetch(url, opts);
-    } catch(e) {
+    try { return await fetch(url, opts); }
+    catch(e) {
       if (i === retries) throw e;
       await new Promise(r => setTimeout(r, 800 * (i + 1)));
     }
   }
 }
 
-// ── Rate limit check [fix #11] ──
+// ── Rate limit check ──
 function checkRateLimit(response) {
   const remaining = parseInt(response.headers.get('X-RateLimit-Remaining') || '');
   if (isNaN(remaining)) return;
   const indicator = document.getElementById('rate-limit-status');
-  const countEl = document.getElementById('rate-limit-count');
+  const countEl   = document.getElementById('rate-limit-count');
   if (remaining < 100) {
     const reset = response.headers.get('X-RateLimit-Reset');
     const resetTime = reset ? new Date(parseInt(reset) * 1000).toLocaleTimeString() : '';
@@ -239,7 +273,7 @@ function checkRateLimit(response) {
       ? `⚠ ${remaining} GitHub requests left${resetTime ? ' · resets ' + resetTime : ''}`
       : `${remaining} GitHub requests left`;
     indicator.style.display = 'inline-flex';
-    indicator.className = remaining < 10 ? 'rate-limit-status critical' : 'rate-limit-status warning';
+    indicator.className = 'rate-limit-status ' + (remaining < 10 ? 'critical' : 'warning');
   } else {
     indicator.style.display = 'none';
   }
@@ -250,10 +284,10 @@ function checkRateLimit(response) {
   }
 }
 
-// ── Fetch repo files [fix #8 path filter, #12 report failures, #13 retry] ──
+// ── Fetch repo files [#4 raised cap to 5000, #8 path filter, #12 report failures, #13 retry] ──
 async function fetchRepoFiles(repoName, maxFiles = 20, pathFilter = '') {
   const token = document.getElementById('github-token').value;
-  const org = document.getElementById('github-org').value.trim();
+  const org   = document.getElementById('github-org').value.trim();
   const headers = { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json' };
 
   const treeRes = await fetchWithRetry(`https://api.github.com/repos/${org}/${repoName}/git/trees/HEAD?recursive=1`, { headers });
@@ -261,18 +295,14 @@ async function fetchRepoFiles(repoName, maxFiles = 20, pathFilter = '') {
   if (!treeRes.ok) throw new Error(`Could not read repo: ${repoName}`);
   const tree = await treeRes.json();
 
-  const PRIORITY_PATTERNS = [/\.py$/, /\.js$/, /\.ts$/, /\.java$/, /\.cs$/, /\.rb$/, /\.php$/, /config/i, /settings/i, /business/i, /logic/i, /process/i, /rules/i, /\.sql$/];
-  const SKIP_PATTERNS = [/node_modules/, /\.min\.js/, /dist\//, /build\//, /package-lock/, /yarn\.lock/, /\.lock$/, /\.map$/, /\.png/, /\.jpg/, /\.ico/, /\.svg/];
+  const PRIORITY = [/\.py$/, /\.js$/, /\.ts$/, /\.java$/, /\.cs$/, /\.rb$/, /\.php$/, /config/i, /settings/i, /business/i, /logic/i, /process/i, /rules/i, /\.sql$/];
+  const SKIP     = [/node_modules/, /\.min\.js/, /dist\//, /build\//, /package-lock/, /yarn\.lock/, /\.lock$/, /\.map$/, /\.png/, /\.jpg/, /\.ico/, /\.svg/];
 
-  let files = (tree.tree || [])
+  const files = (tree.tree || [])
     .filter(f => f.type === 'blob')
-    .filter(f => !SKIP_PATTERNS.some(p => p.test(f.path)))
+    .filter(f => !SKIP.some(p => p.test(f.path)))
     .filter(f => !pathFilter || f.path.toLowerCase().includes(pathFilter.toLowerCase()))
-    .sort((a, b) => {
-      const aScore = PRIORITY_PATTERNS.filter(p => p.test(a.path)).length;
-      const bScore = PRIORITY_PATTERNS.filter(p => p.test(b.path)).length;
-      return bScore - aScore;
-    })
+    .sort((a, b) => PRIORITY.filter(p => p.test(b.path)).length - PRIORITY.filter(p => p.test(a.path)).length)
     .slice(0, maxFiles);
 
   const failedFiles = [];
@@ -283,8 +313,8 @@ async function fetchRepoFiles(repoName, maxFiles = 20, pathFilter = '') {
       if (!r.ok) { failedFiles.push(f.path); return null; }
       const d = await r.json();
       if (d.encoding === 'base64') {
-        const text = atob(d.content.replace(/\n/g,''));
-        return `\n\n### FILE: ${f.path}\n\`\`\`\n${text.slice(0, 3000)}\n\`\`\``;
+        const text = atob(d.content.replace(/\n/g, ''));
+        return `\n\n### FILE: ${f.path}\n\`\`\`\n${text.slice(0, 5000)}\n\`\`\``;
       }
       return null;
     } catch { failedFiles.push(f.path); return null; }
@@ -297,37 +327,97 @@ async function fetchRepoFiles(repoName, maxFiles = 20, pathFilter = '') {
   return result;
 }
 
-// ── Claude API ──
-async function askClaude(systemPrompt, messages) {
-  const key = document.getElementById('anthropic-key').value;
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
-    body: JSON.stringify({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 4096,
-      system: systemPrompt,
-      messages: messages
-    })
-  });
+// ── Multi-LLM streaming [#3, #14, #15, #16] ──
+async function askLLMStreaming(systemPrompt, messages, onChunk, onComplete) {
+  const provider = document.getElementById('provider').value;
+  const key      = document.getElementById('anthropic-key').value;
+  const model    = document.getElementById('model-name').value.trim() || PROVIDER_DEFAULTS[provider]?.model || '';
+
+  let res;
+  if (provider === 'anthropic') {
+    res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': key,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
+      },
+      body: JSON.stringify({ model, max_tokens: 4096, system: systemPrompt, messages, stream: true }),
+    });
+  } else {
+    const baseUrl = provider === 'custom'
+      ? document.getElementById('base-url').value.trim().replace(/\/$/, '')
+      : 'https://api.openai.com/v1';
+    res = await fetch(`${baseUrl}/chat/completions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
+      body: JSON.stringify({
+        model, max_tokens: 4096,
+        messages: [{ role: 'system', content: systemPrompt }, ...messages],
+        stream: true,
+        stream_options: { include_usage: true },
+      }),
+    });
+  }
+
   if (!res.ok) {
-    const err = await res.json();
+    const err = await res.json().catch(() => ({}));
     throw new Error(err.error?.message || `API error ${res.status}`);
   }
-  const data = await res.json();
-  return data.content[0].text;
+
+  let fullText = '';
+  let inputTokens = 0, outputTokens = 0;
+  const reader  = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split('\n');
+    buffer = lines.pop(); // keep incomplete line in buffer
+
+    for (const line of lines) {
+      if (!line.startsWith('data: ')) continue;
+      const data = line.slice(6).trim();
+      if (data === '[DONE]') continue;
+      try {
+        const json = JSON.parse(data);
+        if (provider === 'anthropic') {
+          if (json.type === 'message_start') {
+            inputTokens = json.message?.usage?.input_tokens || 0;
+          } else if (json.type === 'content_block_delta' && json.delta?.type === 'text_delta') {
+            fullText += json.delta.text;
+            onChunk(fullText);
+          } else if (json.type === 'message_delta') {
+            outputTokens = json.usage?.output_tokens || 0;
+          }
+        } else {
+          const content = json.choices?.[0]?.delta?.content;
+          if (content) { fullText += content; onChunk(fullText); }
+          if (json.usage) {
+            inputTokens  = json.usage.prompt_tokens     || 0;
+            outputTokens = json.usage.completion_tokens || 0;
+          }
+        }
+      } catch {}
+    }
+  }
+
+  onComplete(fullText, inputTokens, outputTokens);
+  return fullText;
 }
 
 // ── Run query ──
 async function runQuery() {
   const query = document.getElementById('query-input').value.trim();
   if (!query) return;
-
-  const key = document.getElementById('anthropic-key').value;
-  if (!key) { alert('Enter your Anthropic API key first.'); return; }
+  if (!document.getElementById('anthropic-key').value) { alert('Enter your API key first.'); return; }
 
   if (currentMode === 'feature') { await runFeatureSearch(query); return; }
-  if (currentMode === 'compare') { await runCompare(query); return; }
+  if (currentMode === 'compare') { await runCompare(query);       return; }
   if (!selectedRepo) { alert('Please select a customer from the sidebar first.'); return; }
 
   const card = addResultCard(selectedRepo, currentMode === 'summarise' ? 'Summary' : 'Translation');
@@ -336,10 +426,9 @@ async function runQuery() {
   document.getElementById('status-text').textContent = 'fetching code...';
 
   try {
-    // [fix #8] read path filter
     const pathFilter = document.getElementById('path-filter').value.trim();
     const code = await fetchRepoFiles(selectedRepo, currentMode === 'summarise' ? 15 : 20, pathFilter);
-    document.getElementById('status-text').textContent = 'asking Claude...';
+    document.getElementById('status-text').textContent = 'asking AI...';
 
     const systemPrompt = currentMode === 'summarise'
       ? `You are a business analyst assistant. Your job is to read source code and explain what the system does in clear, plain English — suitable for a non-technical business stakeholder or project manager. Focus on: what business problems the system solves, the main business processes and workflows, key business rules or logic, integrations with other systems, and what data flows in and out. Use business language, not technical jargon. Structure your answer with clear headings.`
@@ -347,8 +436,17 @@ async function runQuery() {
 
     const userMessage = `Customer repository: ${selectedRepo}\n\nCode files:\n${code}\n\nQuestion: ${query}`;
     const messages = [{ role: 'user', content: userMessage }];
-    const answer = await askClaude(systemPrompt, messages);
-    updateResultCard(card, answer, false, systemPrompt, [...messages, { role: 'assistant', content: answer }]);
+
+    beginStreaming(card);
+    const body = document.getElementById(card._bodyId);
+
+    await askLLMStreaming(systemPrompt, messages,
+      partial => { body.textContent = partial; },
+      (fullText, inputTokens, outputTokens) => {
+        updateResultCard(card, fullText, false, systemPrompt, [...messages, { role: 'assistant', content: fullText }]);
+        showTokenBadge(card, inputTokens, outputTokens);
+      }
+    );
   } catch(e) {
     updateResultCard(card, `Error: ${e.message}`, true);
   }
@@ -358,12 +456,10 @@ async function runQuery() {
   document.getElementById('status-text').textContent = 'configured';
 }
 
-// ── Feature search [fix #6: raise cap to 50] ──
+// ── Feature search ──
 async function runFeatureSearch(query) {
   if (!allRepos.length) { alert('Load repositories first.'); return; }
-  const key = document.getElementById('anthropic-key').value;
-  const token = document.getElementById('github-token').value;
-  if (!key || !token) { alert('Configure API keys first.'); return; }
+  if (!document.getElementById('anthropic-key').value) { alert('Configure API key first.'); return; }
 
   const card = addResultCard('All customers', 'Feature Search');
   document.getElementById('send-btn').disabled = true;
@@ -380,11 +476,21 @@ async function runFeatureSearch(query) {
       } catch { return `CUSTOMER: ${repo.name}\n(could not read)`; }
     }));
 
-    document.getElementById('status-text').textContent = 'asking Claude...';
+    document.getElementById('status-text').textContent = 'asking AI...';
 
     const systemPrompt = `You are a business analyst. You are given code snippets from multiple customer repositories. Answer the user's question by identifying which customers have the requested feature or capability. Be specific — name the customers and explain what you found in their code. Speak in business language.`;
-    const answer = await askClaude(systemPrompt, [{ role: 'user', content: `Question: ${query}\n\nCustomer repositories:\n\n${summaries.join('\n\n---\n\n')}` }]);
-    updateResultCard(card, answer, false, null, null);
+    const messages = [{ role: 'user', content: `Question: ${query}\n\nCustomer repositories:\n\n${summaries.join('\n\n---\n\n')}` }];
+
+    beginStreaming(card);
+    const body = document.getElementById(card._bodyId);
+
+    await askLLMStreaming(systemPrompt, messages,
+      partial => { body.textContent = partial; },
+      (fullText, inputTokens, outputTokens) => {
+        updateResultCard(card, fullText, false, null, null);
+        showTokenBadge(card, inputTokens, outputTokens);
+      }
+    );
   } catch(e) {
     updateResultCard(card, `Error: ${e.message}`, true);
   }
@@ -398,8 +504,7 @@ async function runFeatureSearch(query) {
 async function runCompare(query) {
   query = query || document.getElementById('query-input').value.trim();
   if (selectedForCompare.size < 2) { alert('Select at least 2 customers to compare.'); return; }
-  const key = document.getElementById('anthropic-key').value;
-  if (!key) { alert('Configure API keys first.'); return; }
+  if (!document.getElementById('anthropic-key').value) { alert('Configure API key first.'); return; }
 
   const customers = Array.from(selectedForCompare);
   const card = addResultCard(customers.join(' vs '), 'Comparison');
@@ -414,13 +519,22 @@ async function runCompare(query) {
       return `CUSTOMER: ${name}\n${code}`;
     }));
 
-    document.getElementById('status-text').textContent = 'asking Claude...';
+    document.getElementById('status-text').textContent = 'asking AI...';
 
     const systemPrompt = `You are a business analyst comparing multiple customer implementations. Explain the similarities and differences between their business logic, processes, and capabilities in plain English. Use a structured format with clear sections. Focus on business impact, not technical details.`;
-    const userMessage = `Question: ${query || 'Compare the business logic and processes of these customers.'}\n\nCustomer repositories:\n\n${codes.join('\n\n---\n\n')}`;
+    const userMessage  = `Question: ${query || 'Compare the business logic and processes of these customers.'}\n\nCustomer repositories:\n\n${codes.join('\n\n---\n\n')}`;
     const messages = [{ role: 'user', content: userMessage }];
-    const answer = await askClaude(systemPrompt, messages);
-    updateResultCard(card, answer, false, systemPrompt, [...messages, { role: 'assistant', content: answer }]);
+
+    beginStreaming(card);
+    const body = document.getElementById(card._bodyId);
+
+    await askLLMStreaming(systemPrompt, messages,
+      partial => { body.textContent = partial; },
+      (fullText, inputTokens, outputTokens) => {
+        updateResultCard(card, fullText, false, systemPrompt, [...messages, { role: 'assistant', content: fullText }]);
+        showTokenBadge(card, inputTokens, outputTokens);
+      }
+    );
   } catch(e) {
     updateResultCard(card, `Error: ${e.message}`, true);
   }
@@ -435,7 +549,7 @@ async function runCompare(query) {
 function addResultCard(customer, mode, opts = {}) {
   document.getElementById('empty-state')?.remove();
   const results = document.getElementById('results');
-  const id = opts.id || String(Date.now());
+  const id   = opts.id   || String(Date.now());
   const time = opts.time || new Date().toLocaleTimeString();
   const card = document.createElement('div');
   card.className = 'result-card';
@@ -462,33 +576,51 @@ function addResultCard(customer, mode, opts = {}) {
     </div>
   `;
   results.prepend(card);
-  card._id = id;
+  card._id       = id;
   card._customer = customer;
-  card._mode = mode;
-  card._time = time;
-  card._bodyId = `rb-${id}`;
+  card._mode     = mode;
+  card._time     = time;
+  card._bodyId   = `rb-${id}`;
   showClearHistoryBtn();
   return card;
+}
+
+function beginStreaming(card) {
+  const body = document.getElementById(card._bodyId);
+  body.classList.remove('loading');
+  body.classList.add('streaming');
 }
 
 function updateResultCard(card, text, isError, systemPrompt, messages, skipSave = false) {
   const body = document.getElementById(card._bodyId);
   if (!body) return;
-  body.classList.remove('loading');
+  body.classList.remove('loading', 'streaming');
   if (isError) {
     body.style.color = '#c0392b';
     body.innerHTML = marked.parse(text);
   } else {
     body.innerHTML = marked.parse(text);
-    card._rawText = text;
+    card._rawText      = text;
     card._systemPrompt = systemPrompt || null;
-    card._messages = messages || null;
+    card._messages     = messages     || null;
     document.getElementById(`cb-${card._id}`).style.display = 'inline-flex';
     if (systemPrompt && messages) {
       document.getElementById(`fu-${card._id}`).style.display = 'block';
     }
     if (!skipSave) saveResults();
   }
+}
+
+// ── Token badge [#15] ──
+function showTokenBadge(card, inputTokens, outputTokens) {
+  if (!inputTokens && !outputTokens) return;
+  const existing = card.querySelector('.token-badge');
+  if (existing) existing.remove();
+  const badge = document.createElement('div');
+  badge.className = 'token-badge';
+  const total = (inputTokens + outputTokens).toLocaleString();
+  badge.textContent = `${total} tokens · ${inputTokens.toLocaleString()} in / ${outputTokens.toLocaleString()} out`;
+  card.querySelector('.result-header').appendChild(badge);
 }
 
 // ── Follow-up chat ──
@@ -519,12 +651,20 @@ async function sendFollowUp(id) {
   const messages = [...card._messages, { role: 'user', content: question }];
 
   try {
-    const answer = await askClaude(card._systemPrompt, messages);
-    aDiv.classList.remove('loading');
-    aDiv.innerHTML = marked.parse(answer);
-    card._messages = [...messages, { role: 'assistant', content: answer }];
-    card._rawText += `\n\n---\n\n**Follow-up:** ${question}\n\n${answer}`;
-    saveResults();
+    let firstChunk = true;
+    await askLLMStreaming(card._systemPrompt, messages,
+      partial => {
+        if (firstChunk) { aDiv.classList.remove('loading'); firstChunk = false; }
+        aDiv.textContent = partial;
+      },
+      (fullText, inputTokens, outputTokens) => {
+        aDiv.innerHTML = marked.parse(fullText);
+        card._messages  = [...messages, { role: 'assistant', content: fullText }];
+        card._rawText  += `\n\n---\n\n**Follow-up:** ${question}\n\n${fullText}`;
+        saveResults();
+        if (inputTokens || outputTokens) showTokenBadge(card, inputTokens, outputTokens);
+      }
+    );
   } catch(e) {
     aDiv.classList.remove('loading');
     aDiv.style.color = '#c0392b';
@@ -548,19 +688,13 @@ function copyResult(id) {
   });
 }
 
-// ── Result persistence [fix #9] ──
+// ── Result persistence ──
 function saveResults() {
   try {
-    const cards = [...document.querySelectorAll('.result-card')]
+    const data = [...document.querySelectorAll('.result-card')]
       .filter(c => c._rawText)
-      .slice(0, 20);
-    const data = cards.map(c => ({
-      id: c._id,
-      customer: c._customer,
-      mode: c._mode,
-      time: c._time,
-      rawText: c._rawText
-    }));
+      .slice(0, 20)
+      .map(c => ({ id: c._id, customer: c._customer, mode: c._mode, time: c._time, rawText: c._rawText }));
     localStorage.setItem('ci_results', JSON.stringify(data));
   } catch {}
 }
@@ -580,8 +714,7 @@ function clearHistory() {
   localStorage.removeItem('ci_results');
   document.querySelectorAll('.result-card').forEach(c => c.remove());
   document.getElementById('results-toolbar')?.remove();
-  const results = document.getElementById('results');
-  results.innerHTML = `<div class="empty-state" id="empty-state">
+  document.getElementById('results').innerHTML = `<div class="empty-state" id="empty-state">
     <div class="empty-icon">◈</div>
     <h2>Ready to translate</h2>
     <p>Load your GitHub repositories, select a customer, and ask questions in plain English.</p>
@@ -596,13 +729,12 @@ function clearHistory() {
 
 function showClearHistoryBtn() {
   if (document.getElementById('results-toolbar')) return;
-  const main = document.querySelector('main');
-  const results = document.getElementById('results');
   const toolbar = document.createElement('div');
   toolbar.id = 'results-toolbar';
   toolbar.className = 'results-toolbar';
   toolbar.innerHTML = '<button class="clear-history-btn" onclick="clearHistory()">Clear history</button>';
-  main.insertBefore(toolbar, results);
+  const results = document.getElementById('results');
+  results.parentElement.insertBefore(toolbar, results);
 }
 
 // ── Init ──
