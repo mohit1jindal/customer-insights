@@ -642,3 +642,43 @@ textarea::placeholder { color: var(--ink3); }
   text-underline-offset: 3px;
 }
 .clear-history-btn:hover { color: #c0392b; }
+
+/* Provider select */
+select {
+  width: 100%;
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--paper);
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--ink);
+  outline: none;
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%238a837a'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  padding-right: 28px;
+}
+select:focus { border-color: var(--accent); }
+
+/* Streaming body state */
+.result-body.streaming {
+  white-space: pre-wrap;
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--ink2);
+}
+
+/* Token badge */
+.token-badge {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--ink3);
+  background: var(--paper2);
+  border: 1px solid var(--border2);
+  border-radius: 3px;
+  padding: 2px 7px;
+  margin-left: auto;
+}
