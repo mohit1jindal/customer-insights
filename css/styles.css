@@ -592,3 +592,53 @@ textarea::placeholder { color: var(--ink3); }
   transition: all 0.15s;
 }
 .followup-send:hover { background: var(--accent); color: white; border-color: var(--accent); }
+
+/* Path filter row [#8] */
+.path-filter-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+.path-filter-label {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--ink3);
+  white-space: nowrap;
+}
+#path-filter {
+  flex: 1;
+  padding: 5px 10px;
+  font-size: 12px;
+}
+
+/* Rate limit indicator [#11] */
+.rate-limit-status {
+  font-family: var(--mono);
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 3px;
+  margin-left: 8px;
+}
+.rate-limit-status.warning { background: rgba(232,120,74,0.15); color: var(--accent2); }
+.rate-limit-status.critical { background: rgba(192,57,43,0.15); color: #c0392b; }
+
+/* Results toolbar [#9] */
+.results-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  padding: 6px 1.5rem;
+  border-bottom: 1px solid var(--border2);
+}
+.clear-history-btn {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--ink3);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 2px 0;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.clear-history-btn:hover { color: #c0392b; }
