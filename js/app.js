@@ -88,7 +88,7 @@ function toggleConfig() {
   document.getElementById('config-chevron').textContent = configVisible ? '▼' : '▶';
 }
 
-// ── Load repos ──
+// ── Load repos ── [fix #7: fetch all repos, not just private]
 async function loadRepos() {
   const token = document.getElementById('github-token').value;
   const org = document.getElementById('github-org').value.trim();
@@ -102,12 +102,14 @@ async function loadRepos() {
     allRepos = [];
     let page = 1;
     while (true) {
-      const url = `https://api.github.com/orgs/${org}/repos?per_page=100&page=${page}&type=private`;
-      const res = await fetch(url, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json' } });
+      const url = `https://api.github.com/orgs/${org}/repos?per_page=100&page=${page}&type=all`;
+      const res = await fetchWithRetry(url, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json' } });
+      checkRateLimit(res);
       if (!res.ok) {
-        const res2 = await fetch(`https://api.github.com/user/repos?per_page=100&page=${page}&visibility=private`, {
+        const res2 = await fetchWithRetry(`https://api.github.com/user/repos?per_page=100&page=${page}`, {
           headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json' }
         });
+        checkRateLimit(res2);
         if (!res2.ok) throw new Error(`GitHub API error: ${res2.status}`);
         const data = await res2.json();
         allRepos = allRepos.concat(data);
@@ -181,6 +183,8 @@ function setMode(mode) {
   document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.mode === mode));
   document.getElementById('compare-bar').style.display = mode === 'compare' ? 'block' : 'none';
   document.getElementById('feature-note').style.display = mode === 'feature' ? 'block' : 'none';
+  // [fix #8] show path filter only for summarise/translate
+  document.getElementById('path-filter-row').style.display = (mode === 'summarise' || mode === 'translate') ? 'flex' : 'none';
   renderQuickPrompts();
   updatePlaceholder();
   if (allRepos.length) renderRepoList(allRepos.filter(r => r.name.toLowerCase().includes(document.getElementById('repo-search').value.toLowerCase())));
@@ -210,22 +214,60 @@ function updatePlaceholder() {
   }
 }
 
-// ── Fetch repo files ──
-async function fetchRepoFiles(repoName, maxFiles = 20) {
+// ── Retry helper [fix #13] ──
+async function fetchWithRetry(url, opts, retries = 2) {
+  for (let i = 0; i <= retries; i++) {
+    try {
+      return await fetch(url, opts);
+    } catch(e) {
+      if (i === retries) throw e;
+      await new Promise(r => setTimeout(r, 800 * (i + 1)));
+    }
+  }
+}
+
+// ── Rate limit check [fix #11] ──
+function checkRateLimit(response) {
+  const remaining = parseInt(response.headers.get('X-RateLimit-Remaining') || '');
+  if (isNaN(remaining)) return;
+  const indicator = document.getElementById('rate-limit-status');
+  const countEl = document.getElementById('rate-limit-count');
+  if (remaining < 100) {
+    const reset = response.headers.get('X-RateLimit-Reset');
+    const resetTime = reset ? new Date(parseInt(reset) * 1000).toLocaleTimeString() : '';
+    countEl.textContent = remaining < 10
+      ? `⚠ ${remaining} GitHub requests left${resetTime ? ' · resets ' + resetTime : ''}`
+      : `${remaining} GitHub requests left`;
+    indicator.style.display = 'inline-flex';
+    indicator.className = remaining < 10 ? 'rate-limit-status critical' : 'rate-limit-status warning';
+  } else {
+    indicator.style.display = 'none';
+  }
+  if (response.status === 403 || response.status === 429) {
+    const reset = response.headers.get('X-RateLimit-Reset');
+    const resetTime = reset ? new Date(parseInt(reset) * 1000).toLocaleTimeString() : 'soon';
+    throw new Error(`GitHub rate limit exceeded. Resets at ${resetTime}.`);
+  }
+}
+
+// ── Fetch repo files [fix #8 path filter, #12 report failures, #13 retry] ──
+async function fetchRepoFiles(repoName, maxFiles = 20, pathFilter = '') {
   const token = document.getElementById('github-token').value;
   const org = document.getElementById('github-org').value.trim();
   const headers = { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json' };
 
-  const treeRes = await fetch(`https://api.github.com/repos/${org}/${repoName}/git/trees/HEAD?recursive=1`, { headers });
+  const treeRes = await fetchWithRetry(`https://api.github.com/repos/${org}/${repoName}/git/trees/HEAD?recursive=1`, { headers });
+  checkRateLimit(treeRes);
   if (!treeRes.ok) throw new Error(`Could not read repo: ${repoName}`);
   const tree = await treeRes.json();
 
   const PRIORITY_PATTERNS = [/\.py$/, /\.js$/, /\.ts$/, /\.java$/, /\.cs$/, /\.rb$/, /\.php$/, /config/i, /settings/i, /business/i, /logic/i, /process/i, /rules/i, /\.sql$/];
   const SKIP_PATTERNS = [/node_modules/, /\.min\.js/, /dist\//, /build\//, /package-lock/, /yarn\.lock/, /\.lock$/, /\.map$/, /\.png/, /\.jpg/, /\.ico/, /\.svg/];
 
-  const files = (tree.tree || [])
+  let files = (tree.tree || [])
     .filter(f => f.type === 'blob')
     .filter(f => !SKIP_PATTERNS.some(p => p.test(f.path)))
+    .filter(f => !pathFilter || f.path.toLowerCase().includes(pathFilter.toLowerCase()))
     .sort((a, b) => {
       const aScore = PRIORITY_PATTERNS.filter(p => p.test(a.path)).length;
       const bScore = PRIORITY_PATTERNS.filter(p => p.test(b.path)).length;
@@ -233,24 +275,29 @@ async function fetchRepoFiles(repoName, maxFiles = 20) {
     })
     .slice(0, maxFiles);
 
+  const failedFiles = [];
   const contents = await Promise.all(files.map(async f => {
     try {
-      const r = await fetch(`https://api.github.com/repos/${org}/${repoName}/contents/${f.path}`, { headers });
-      if (!r.ok) return null;
+      const r = await fetchWithRetry(`https://api.github.com/repos/${org}/${repoName}/contents/${f.path}`, { headers });
+      checkRateLimit(r);
+      if (!r.ok) { failedFiles.push(f.path); return null; }
       const d = await r.json();
       if (d.encoding === 'base64') {
         const text = atob(d.content.replace(/\n/g,''));
         return `\n\n### FILE: ${f.path}\n\`\`\`\n${text.slice(0, 3000)}\n\`\`\``;
       }
       return null;
-    } catch { return null; }
+    } catch { failedFiles.push(f.path); return null; }
   }));
 
-  return contents.filter(Boolean).join('');
+  let result = contents.filter(Boolean).join('');
+  if (failedFiles.length) {
+    result += `\n\n[${failedFiles.length} file(s) could not be read: ${failedFiles.slice(0, 5).join(', ')}${failedFiles.length > 5 ? '…' : ''}]`;
+  }
+  return result;
 }
 
 // ── Claude API ──
-// messages is an array of {role, content} to support multi-turn follow-up
 async function askClaude(systemPrompt, messages) {
   const key = document.getElementById('anthropic-key').value;
   const res = await fetch('https://api.anthropic.com/v1/messages', {
@@ -289,7 +336,9 @@ async function runQuery() {
   document.getElementById('status-text').textContent = 'fetching code...';
 
   try {
-    const code = await fetchRepoFiles(selectedRepo, currentMode === 'summarise' ? 15 : 20);
+    // [fix #8] read path filter
+    const pathFilter = document.getElementById('path-filter').value.trim();
+    const code = await fetchRepoFiles(selectedRepo, currentMode === 'summarise' ? 15 : 20, pathFilter);
     document.getElementById('status-text').textContent = 'asking Claude...';
 
     const systemPrompt = currentMode === 'summarise'
@@ -309,7 +358,7 @@ async function runQuery() {
   document.getElementById('status-text').textContent = 'configured';
 }
 
-// ── Feature search ──
+// ── Feature search [fix #6: raise cap to 50] ──
 async function runFeatureSearch(query) {
   if (!allRepos.length) { alert('Load repositories first.'); return; }
   const key = document.getElementById('anthropic-key').value;
@@ -321,7 +370,7 @@ async function runFeatureSearch(query) {
   document.getElementById('status-dot').className = 'dot loading';
 
   try {
-    const sample = allRepos.slice(0, 30);
+    const sample = allRepos.slice(0, 50);
     document.getElementById('status-text').textContent = `scanning ${sample.length} repos...`;
 
     const summaries = await Promise.all(sample.map(async repo => {
@@ -383,11 +432,11 @@ async function runCompare(query) {
 }
 
 // ── Result cards ──
-function addResultCard(customer, mode) {
+function addResultCard(customer, mode, opts = {}) {
   document.getElementById('empty-state')?.remove();
   const results = document.getElementById('results');
-  const time = new Date().toLocaleTimeString();
-  const id = String(Date.now());
+  const id = opts.id || String(Date.now());
+  const time = opts.time || new Date().toLocaleTimeString();
   const card = document.createElement('div');
   card.className = 'result-card';
   card.innerHTML = `
@@ -414,11 +463,15 @@ function addResultCard(customer, mode) {
   `;
   results.prepend(card);
   card._id = id;
+  card._customer = customer;
+  card._mode = mode;
+  card._time = time;
   card._bodyId = `rb-${id}`;
+  showClearHistoryBtn();
   return card;
 }
 
-function updateResultCard(card, text, isError, systemPrompt, messages) {
+function updateResultCard(card, text, isError, systemPrompt, messages, skipSave = false) {
   const body = document.getElementById(card._bodyId);
   if (!body) return;
   body.classList.remove('loading');
@@ -434,6 +487,7 @@ function updateResultCard(card, text, isError, systemPrompt, messages) {
     if (systemPrompt && messages) {
       document.getElementById(`fu-${card._id}`).style.display = 'block';
     }
+    if (!skipSave) saveResults();
   }
 }
 
@@ -470,6 +524,7 @@ async function sendFollowUp(id) {
     aDiv.innerHTML = marked.parse(answer);
     card._messages = [...messages, { role: 'assistant', content: answer }];
     card._rawText += `\n\n---\n\n**Follow-up:** ${question}\n\n${answer}`;
+    saveResults();
   } catch(e) {
     aDiv.classList.remove('loading');
     aDiv.style.color = '#c0392b';
@@ -493,10 +548,68 @@ function copyResult(id) {
   });
 }
 
+// ── Result persistence [fix #9] ──
+function saveResults() {
+  try {
+    const cards = [...document.querySelectorAll('.result-card')]
+      .filter(c => c._rawText)
+      .slice(0, 20);
+    const data = cards.map(c => ({
+      id: c._id,
+      customer: c._customer,
+      mode: c._mode,
+      time: c._time,
+      rawText: c._rawText
+    }));
+    localStorage.setItem('ci_results', JSON.stringify(data));
+  } catch {}
+}
+
+function loadSavedResults() {
+  try {
+    const data = JSON.parse(localStorage.getItem('ci_results') || '[]');
+    if (!data.length) return;
+    [...data].reverse().forEach(d => {
+      const card = addResultCard(d.customer, d.mode, { id: d.id, time: d.time });
+      updateResultCard(card, d.rawText, false, null, null, true);
+    });
+  } catch {}
+}
+
+function clearHistory() {
+  localStorage.removeItem('ci_results');
+  document.querySelectorAll('.result-card').forEach(c => c.remove());
+  document.getElementById('results-toolbar')?.remove();
+  const results = document.getElementById('results');
+  results.innerHTML = `<div class="empty-state" id="empty-state">
+    <div class="empty-icon">◈</div>
+    <h2>Ready to translate</h2>
+    <p>Load your GitHub repositories, select a customer, and ask questions in plain English.</p>
+    <div class="steps">
+      <div class="step">1. configure</div>
+      <div class="step">2. load repos</div>
+      <div class="step">3. select customer</div>
+      <div class="step">4. ask</div>
+    </div>
+  </div>`;
+}
+
+function showClearHistoryBtn() {
+  if (document.getElementById('results-toolbar')) return;
+  const main = document.querySelector('main');
+  const results = document.getElementById('results');
+  const toolbar = document.createElement('div');
+  toolbar.id = 'results-toolbar';
+  toolbar.className = 'results-toolbar';
+  toolbar.innerHTML = '<button class="clear-history-btn" onclick="clearHistory()">Clear history</button>';
+  main.insertBefore(toolbar, results);
+}
+
 // ── Init ──
 (async () => {
   const fromServer = await loadServerConfig();
   if (!fromServer) loadConfig();
   renderQuickPrompts();
   updatePlaceholder();
+  loadSavedResults();
 })();
