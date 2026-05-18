@@ -33,7 +33,28 @@
   </div>
   <div class="config-body" id="config-body">
     <div class="config-group">
-      <label>Anthropic API Key</label>
+      <label>AI Provider</label>
+      <select id="provider" onchange="onProviderChange()">
+        <option value="anthropic">Anthropic (Claude)</option>
+        <option value="openai">OpenAI (GPT)</option>
+        <option value="custom">Custom (OpenAI-compatible)</option>
+      </select>
+    </div>
+    <div class="config-group" id="base-url-group" style="display:none">
+      <label>Base URL</label>
+      <input type="text" id="base-url" placeholder="https://api.groq.com/openai/v1" oninput="saveConfig()"/>
+    </div>
+    <div class="config-group">
+      <label>Model</label>
+      <input type="text" id="model-name" list="model-suggestions" placeholder="claude-sonnet-4-20250514" oninput="saveConfig()"/>
+      <datalist id="model-suggestions">
+        <option value="claude-sonnet-4-20250514">
+        <option value="claude-opus-4-7">
+        <option value="claude-haiku-4-5-20251001">
+      </datalist>
+    </div>
+    <div class="config-group">
+      <label>API Key</label>
       <input type="password" id="anthropic-key" placeholder="sk-ant-..." oninput="saveConfig()"/>
     </div>
     <div class="config-group">
