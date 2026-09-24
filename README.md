@@ -38,7 +38,7 @@ When you manage dozens of customer implementations, answering questions like:
 3. Click **Load Repositories** — the sidebar populates with all your repos
 4. Select a customer, ask anything in plain English — the AI reads the source files and responds in business language
 
-All API calls go directly from your browser to GitHub and your AI provider. Nothing is stored on any server.
+API calls go directly from your browser to GitHub and your AI provider. GitHub receives your GitHub token; the AI provider receives its API key and the code and prompts submitted for analysis. Credentials and result history are also saved in this browser's localStorage.
 
 ---
 
@@ -52,7 +52,7 @@ open index.html
 # Drop the folder on Netlify, S3, GitHub Pages, etc.
 ```
 
-For server-deployed environments (Tomcat, JBoss, WebLogic), copy `config.sample.json` → `config.json`, fill in credentials, and package as a WAR — the `WEB-INF/web.xml` descriptor is already included.
+For server-deployed environments (Tomcat, JBoss, WebLogic), `config.sample.json` can be copied to `config.json` and packaged with the static app as a WAR; `WEB-INF/web.xml` is included. The browser fetches `config.json`, so credentials placed there are readable by anyone who can access that file. This packaging does not add a backend credential proxy.
 
 See [`docs/guide.html`](docs/guide.html) for the full deployment guide.
 
@@ -87,6 +87,6 @@ customer-insights/
 
 - Feature Search scans up to 50 repositories
 - Files are prioritised by likely business relevance (`.py`, `.java`, `.sql`, config files) and capped at 5,000 characters each
-- API keys never leave the browser
+- API keys are sent to the selected API provider to authenticate requests; the GitHub token is sent to GitHub
 - Retry with exponential backoff on GitHub API failures
 - GitHub rate limit indicator shown in the header when quota runs low
